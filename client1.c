@@ -9,11 +9,13 @@
 #include <unistd.h>
 
 #include <ctype.h>
+#include <stdbool.h>
 
 #define RETURNED_ERROR -1
 #define SERVER_ON_CONNECT_MSG_SIZE 40
 #define MIN_CHANNELS 1
 #define MAX_CHANNELS 5
+#define RESET_TO_ZERO 0
 
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
 
@@ -106,7 +108,8 @@ int main(int argc, char *argv[])
     /* Receive message back from server */
     connection_success(sockfd);
 
-    int id_inputted;
+    int id_inputted = RESET_TO_ZERO;
+
     int *id_ptr = &id_inputted; /* Pointer to user inputted channel id*/
 
     char command_input[10]; /* User inputted command i.e. SUB, NEXT etc. */
@@ -124,6 +127,7 @@ int main(int argc, char *argv[])
         if (strncmp(command_input, "OPTIONS", strlen("OPTIONS")) == 0)
         {
             display_options();
+            printf("\nType Command: ");
         }
 
         // User enters SUB <channel id>
@@ -131,12 +135,84 @@ int main(int argc, char *argv[])
             id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         {
             printf("\n%s  %d\n", command_input, id_inputted);
+            printf("\nType Command: ");
         }
 
-        else
+        // // User enters UNSUB <channel id>
+        if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
+            id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         {
-            printf("\nNOPE\n");
+            printf("\n%s  %d\n", command_input, id_inputted);
+            id_inputted = -1;
+            printf("\nType Command: ");
         }
+
+        // // User enters LIVEFEED <channel id>
+        if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 && id_inputted == 0)
+        { // User enters LIVEFEED only
+            printf("\n NO ID, Continuosly show msg from all channels... %s  \n", command_input);
+            printf("\nType Command: ");
+        }
+        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
+                 id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        {
+            printf("\n WITH ID %s  %d\n", command_input, id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
+                     id_inputted < MIN_CHANNELS ||
+                 id_inputted > MAX_CHANNELS)
+        {
+            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+
+        else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 && id_inputted == 0)
+        { //User enters NEXT only
+            printf("\n NO ID - SHOW  *UNREAD* MSG FROM ALL CHANNELS, OK... %s  \n", command_input);
+            printf("\nType Command: ");
+        }
+        else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 &&
+                 id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        { // // User enters NEXT <channel id>
+
+            printf("\n WITH ID %s  %d\n", command_input, id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+        else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 &&
+                     id_inputted < MIN_CHANNELS ||
+                 id_inputted > MAX_CHANNELS)
+        {
+            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+
+        // // User enters BYE
+        if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
+        {
+            printf("\n %s \n", command_input);
+            id_inputted = -1;
+            printf("\nType Command: ");
+        }
+
+        // User enters SEND <channelid> <message>
+        // if (strncmp(command_input, "SEND", strlen("SEND")) == 0 &&
+        //     id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        // {
+        // correct_input = 1;
+        //     printf("\n%s  %d\n", command_input, id_inputted);
+        // id_inputted = -1;
+        //        printf("\nType Command: ");
+
+        // }
     }
 
     close(sockfd);

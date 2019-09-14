@@ -40,7 +40,7 @@ void shut_down_handler()
     // shared memory regions
     // free allocated memory and open files
     sleep(1);
-    write(1, "\nShutting down gracefully, BYE!\n", 29);
+    write(1, "\n\nShutting down gracefully, BYE!\n\n", 35);
     exit(1);
 }
 
