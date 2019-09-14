@@ -1,15 +1,19 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <string.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <ctype.h>
+
 #define RETURNED_ERROR -1
 #define SERVER_ON_CONNECT_MSG_SIZE 40
+#define MIN_CHANNELS 1
+#define MAX_CHANNELS 5
 
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
 
@@ -27,9 +31,23 @@
 // }
 
 // convert into function 0 - shows commands and nums
+
+void display_options()
+{
+    printf("\nUsage: \n");
+    printf("\n SUB <channelid>               :  Subcribe to chanenel \n");
+    printf("\n UNSUB <channelid>             :  Unsubcribe to chanenel \n");
+    printf("\n NEXT <channelid>              :  Display the next unread message with given ID \n");
+    printf("\n LIVEFEED <channelid>          :  Display all unread messages continuously with given ID \n");
+    printf("\n NEXT                          :  Display the next unread message from all channels \n");
+    printf("\n LIVEFEED <channelid>          :  Display all unread messages continuously from all channels \n");
+    printf("\n NEXT <channelid>              :  Display the next unread message with given ID \n");
+    printf("\n SEND <channelid> <message>    :  Send a new message to given channel ID \n");
+    printf("\n BYE                           :  Shutdown connection \n");
+}
 void display_menu()
 {
-    printf("\nChoose Your Options <0>\n");
+    printf("\n See Usage type [OPTIONS]\n");
     printf("\nType Command: ");
 }
 
@@ -44,7 +62,7 @@ int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED
         exit(EXIT_FAILURE);
     }
 
-    printf("%s", buff);
+    printf("\n%s", buff);
 }
 
 int main(int argc, char *argv[])
@@ -88,44 +106,36 @@ int main(int argc, char *argv[])
     /* Receive message back from server */
     connection_success(sockfd);
 
-    int sub;
-    int *sub_ptr = &sub;
+    int id_inputted;
+    int *id_ptr = &id_inputted; /* Pointer to user inputted channel id*/
+
+    char command_input[10]; /* User inputted command i.e. SUB, NEXT etc. */
+
+    char user_input[20]; /* user input */
 
     display_menu();
 
-    while (1)
+    while (fgets(user_input, 20, stdin))
     {
-        // scan for input from client for next, live, blah
-        scanf("%d", sub_ptr);
+        sscanf(user_input, "%s %d", command_input, id_ptr);
+        // printf("%s %d\n", command_input, id_inputted);
 
-        switch (*sub_ptr)
+        // User enters OPTION:
+        if (strncmp(command_input, "OPTIONS", strlen("OPTIONS")) == 0)
         {
-        case 1:
-            /* code */
-            // NEXT_FUNC_STUFF()
-            printf("\nType Command: ");
-            break;
-        case 2:
-            /* code */
-            // LIVE_FEED_STUFF()
-            printf("\nType Command: ");
+            display_options();
+        }
 
-            break;
-        case 3:
-            /* code */
-            // printf("You choose 3\n");
-            printf("\nType Command: ");
+        // User enters SUB <channel id>
+        if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
+            id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        {
+            printf("\n%s  %d\n", command_input, id_inputted);
+        }
 
-            break;
-        case 4:
-            /* code */
-            // printf("You choose 4\n");
-            printf("\nType Command: ");
-
-            break;
-
-        default:
-            break;
+        else
+        {
+            printf("\nNOPE\n");
         }
     }
 
