@@ -129,33 +129,69 @@ int main(int argc, char *argv[])
             display_options();
             printf("\nType Command: ");
         }
+        else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
+                 id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        { // User enters SUB <channel id>
 
-        // User enters SUB <channel id>
-        if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
-            id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        {
             printf("\n%s  %d\n", command_input, id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+        else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
+                     id_inputted < MIN_CHANNELS ||
+                 id_inputted > MAX_CHANNELS)
+        {
+            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+        else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
+                 id_inputted == 0)
+        {
+            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
             printf("\nType Command: ");
         }
 
-        // // User enters UNSUB <channel id>
-        if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
-            id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        {
+        else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
+                 id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        { // // User enters UNSUB <channel id>
+
             printf("\n%s  %d\n", command_input, id_inputted);
-            id_inputted = -1;
+            id_inputted = RESET_TO_ZERO;
+
             printf("\nType Command: ");
         }
+        else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
+                     id_inputted < MIN_CHANNELS ||
+                 id_inputted > MAX_CHANNELS)
+        {
+            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
+            id_inputted = RESET_TO_ZERO;
 
-        // // User enters LIVEFEED <channel id>
-        if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 && id_inputted == 0)
+            printf("\nType Command: ");
+        }
+        else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
+                 id_inputted == 0)
+        {
+            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+        // TOD: BUG = LIVEFEED 0, LIVEFEED1 Make this true. Fix: Trim the input? regex?
+        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 && id_inputted == 0)
         { // User enters LIVEFEED only
             printf("\n NO ID, Continuosly show msg from all channels... %s  \n", command_input);
             printf("\nType Command: ");
         }
         else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        {
+        { // // User enters LIVEFEED <channel id>
+
             printf("\n WITH ID %s  %d\n", command_input, id_inputted);
             id_inputted = RESET_TO_ZERO;
 
@@ -171,6 +207,7 @@ int main(int argc, char *argv[])
             printf("\nType Command: ");
         }
 
+        // TOD: BUG = NEXT 0, LIVEFEED1 Make this true. Fix: Trim the input? regex?
         else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 && id_inputted == 0)
         { //User enters NEXT only
             printf("\n NO ID - SHOW  *UNREAD* MSG FROM ALL CHANNELS, OK... %s  \n", command_input);
@@ -195,11 +232,21 @@ int main(int argc, char *argv[])
             printf("\nType Command: ");
         }
 
-        // // User enters BYE
-        if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
-        {
+        else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
+        { // // User enters BYE
+
             printf("\n %s \n", command_input);
-            id_inputted = -1;
+            printf("\n BYE BYE! \n");
+            id_inputted = RESET_TO_ZERO;
+
+            sleep(1);
+            exit(1);
+        }
+        else
+        {
+            printf("\nErr! Incorrect Input. Try again\n");
+            id_inputted = RESET_TO_ZERO;
+
             printf("\nType Command: ");
         }
 
