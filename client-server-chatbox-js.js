@@ -9,17 +9,26 @@ const channel1 = {
 const message1 = {
   messageID: 1,
   ownerID: 1,
-  content: "This is a message! 1"
+  content: "This is a message! 1",
+  next: null
 };
 const message2 = {
   messageID: 2,
   ownerID: 1,
-  content: "This is a message! 2"
+  content: "This is a message! 2",
+  next: null
 };
 const message3 = {
   messageID: 3,
   ownerID: 1,
-  content: "This is a message! 3"
+  content: "This is a message! 3",
+  next: null
+};
+const message4 = {
+  messageID: 4,
+  ownerID: 1,
+  content: "This is a message! 4",
+  next: null
 };
 
 const client1 = {
@@ -27,7 +36,8 @@ const client1 = {
   readMsg: 0,
   unReadMsg: 0,
   totalMessageSent: 0,
-  messageQueueIndex: null /* index = message that it read currently, NOT NEXT ONE */,
+  messageQueueIndex: 0 /* index = message that it read currently, NOT NEXT ONE */,
+  entryIndexConstant: null /* index of msg queue at which the client subed */,
   next: null
 };
 const client2 = {
@@ -35,7 +45,9 @@ const client2 = {
   readMsg: 0,
   unReadMsg: 0,
   totalMessageSent: 0,
-  messageQueueIndex: null /* index = message that it read currently, NOT NEXT ONE */,
+  messageQueueIndex: 0 /* index = message that it read currently, NOT NEXT ONE */,
+  entryIndexConstant: null /* index of msg queue at which the client subed */,
+
   next: null
 };
 const client3 = {
@@ -43,7 +55,9 @@ const client3 = {
   readMsg: 0,
   unReadMsg: 0,
   totalMessageSent: 0,
-  messageQueueIndex: null /* index = message that it read currently, NOT NEXT ONE */,
+  messageQueueIndex: 0 /* index = message that it read currently, NOT NEXT ONE */,
+  entryIndexConstant: null /* index of msg queue at which the client subed */,
+
   next: null
 };
 const client4 = {
@@ -51,7 +65,8 @@ const client4 = {
   readMsg: 0,
   unReadMsg: 0,
   totalMessageSent: 0,
-  messageQueueIndex: null /* index = message that it read currently, NOT NEXT ONE */,
+  messageQueueIndex: 0 /* index = message that it read currently, NOT NEXT ONE */,
+  entryIndexConstant: null /* index of msg queue at which the client subed */,
   next: null
 };
 
@@ -67,12 +82,11 @@ function subscribe(client, channelID) {
 
       if (channel.subscriberHead == null) {
         const message = findLastMsgInLinkedList(channel);
-        message == null
-          ? (client.messageQueueIndex = 0)
-          : (client.messageQueueIndex = message.messageID);
+        // works too! message == null ? client.messageQueueIndex = 0 : client.messageQueueIndex = message.messageID;
+        client.messageQueueIndex = channel.totalMsg;
+        client.entryIndexConstant = channel.totalMsg; // assign entry index based on msg in list constant
 
         channel.subscriberHead = client;
-
         channel.subscriberTail = channel.subscriberHead; // track the last node
       } else {
         while (currentNode.next != null) {
@@ -80,10 +94,14 @@ function subscribe(client, channelID) {
           currentNode = currentNode.next;
         }
         const message = findLastMsgInLinkedList(channel);
-        // add the lastMessageSubscribePoint client only accesses msgs after subscription
-        message == null
-          ? (client.messageQueueIndex = 0)
-          : (client.messageQueueIndex = message.messageID);
+        // update the read message queue index for the above message read.
+        // works too! message == null ? client.messageQueueIndex = 0 : client.messageQueueIndex = message.messageID;
+        client.messageQueueIndex = channel.totalMsg;
+
+        channel.totalMsg = channel.totalMsg;
+
+        // assign the index value of the last msg as subbed entry (never changes!)
+        client.entryIndexConstant = channel.totalMsg;
 
         currentNode.next = client; // on the last node add next client
         channel.subscriberTail = currentNode.next; // track the last node
@@ -99,15 +117,16 @@ function subscribe(client, channelID) {
 // when subscribing to channel, finds out the last message in the channel, and will be used to add the message id to the subscribing client
 function findLastMsgInLinkedList(channel) {
   var lastMsgInList = null;
+  var msgHead = channel.messageHead;
 
   if (channel.messageHead == null) {
     // no messages in linkedlist
     lastMsgInList = null;
   }
 
-  while (channel.messageHead != null) {
-    lastMsgInList = channel.messageHead;
-    channel.messageHead = channel.messageHead.next;
+  while (msgHead != null) {
+    lastMsgInList = msgHead;
+    msgHead = msgHead.next;
   }
 
   return lastMsgInList;
@@ -118,25 +137,22 @@ function writeToChannelReq(clientID, channelID, newMessage) {
   hostedChannels.forEach(channel => {
     if (channel.channelID == channelID) {
       // channel exists
-      // channel.subscribers.forEach((client) => {
       var client = findSubsriberInList(channel, clientID);
-      print("client!!!", client);
       if (client.clientID == clientID) {
         // client is subscribed to channel
         // critical section ?
         tailMsg = channel.messageHead;
         channel.messageHead = newMessage;
         channel.messageHead.next = tailMsg;
-        // TODO: update unreadMsg property for all subcribed clients except client with this clientID
+        // works: update unreadMsg property for all subcribed clients except client with this clientID
         updateUnreadMsgCountForSubscribers(channel);
 
-        // TODO: update total msg count for channel.totalMessages
+        // update total msg count for channel.totalMessages
         channel.totalMsg += 1;
         // end of critical section ?
       } else {
-        Error("no client subscribed to the ");
+        console.log("error: no client subscribed to the ");
       }
-      // });
     }
   });
 }
@@ -174,11 +190,8 @@ function readNextMsgFromChannel(clientID, channelID) {
   hostedChannels.forEach(channel => {
     if (channel.channelID == channelID) {
       // channel exists
-      // channel.subscribers.forEach((client) => {
       var client = findSubsriberInList(channel, clientID);
-      console.log("read req by ", client);
       //  find the NEXT unread message in the channel messag linked list
-      // FIX THIS SHIT!!!!!!!!@#@#!
       var nextMessage = searchNextMsgInList(channel, client);
       nextMessage == null
         ? (unreadMessage = "no message found")
@@ -187,10 +200,8 @@ function readNextMsgFromChannel(clientID, channelID) {
   });
   return unreadMessage;
 }
-
 function searchNextMsgInList(channel, client) {
   var unreadMessage = null;
-
   var currentNode = channel.messageHead;
   var clientsNextMessageToReadIndex = client.messageQueueIndex + 1;
 
@@ -206,7 +217,6 @@ function searchNextMsgInList(channel, client) {
       unreadMessage = currentNode;
       client.messageQueueIndex += 1; // update messageQueueIndex
 
-      console.log("!@#$%#@", unreadMessage);
       client.readMsg += 1; // update read messages count
       client.unReadMsg -= 1; // update unread messages count
     }
@@ -219,38 +229,33 @@ function searchNextMsgInList(channel, client) {
 hostedChannels = [channel1]; // add channel
 
 subscribe(client1, 1); // subscribe client to channel
-subscribe(client2, 1); // subscribe client to channel
-subscribe(client3, 1); // subscribe client to channel
-subscribe(client4, 1); // subscribe client to channel
-
 writeToChannelReq(1, 1, message1); // write to channel;
 writeToChannelReq(1, 1, message2); // write to channel;
+
+subscribe(client2, 1); // subscribe client to channel
 writeToChannelReq(1, 1, message3); // write to channel;
 
-writeToChannelReq(2, 1, message3); // write to channel;
-console.log("subed client to channel: ", hostedChannels[0].subscriberHead); // works! added!
+subscribe(client3, 1); // subscribe client to channel
+writeToChannelReq(1, 1, message4); // write to channel;
+// writeToChannelReq(1, 1, message3); // write to channel;
+
+subscribe(client4, 1); // subscribe client to channel
+// writeToChannelReq(2, 1, message3); // write to channel;
+
+// console.log("subed client to channel: ",hostedChannels[0].subscriberHead); // works! added!
 
 // console.log("write to channel client1: ", hostedChannels[0].messageHead);
 // console.log("client's stats: ", hostedChannels[0].subscribers[0])
 
 var m1 = readNextMsgFromChannel(1, 1);
-console.log("unread message: ", m1);
+// console.log("message says ", m1)
+var m1 = readNextMsgFromChannel(1, 1);
 
-//  var m2 = readNextMsgFromChannel(1, 1);
-// console.log("unread message: ", m2);
+var m1 = readNextMsgFromChannel(2, 1);
 
-// // var ms2 = readNextMsgFromChannel(1, 1);
-// // console.log("unread message: ", ms2);
+// WORKING V3
 
-// var ms3 = readNextMsgFromChannel(1, 1);
-// console.log("unread message: ", ms3)
-
-// var ms4 = readNextMsgFromChannel(1, 1);
-// console.log("unread message: ", ms4)
-
-// WORKING V2
-
-// console.log("first subscriber on channel: ", hostedChannels[0].subscriberHead);
-// console.log("Last subscriber on channel: ", hostedChannels[0].subscriberTail);
+console.log("first subscriber on channel: ", hostedChannels[0].subscriberHead);
+console.log("Last subscriber on channel: ", hostedChannels[0].subscriberTail);
 
 console.log("channel 1 %%%: ", hostedChannels[0]);
