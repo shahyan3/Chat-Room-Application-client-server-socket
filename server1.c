@@ -133,9 +133,31 @@ int main(int argc, char *argv[])
         if (send(new_fd, "Welcome! Your client ID is <client id>.\n", 40, 0) == -1)
             perror("send");
 
+        // Receive client request
+        char clientRequest[1024];
+        int channel_id;
+        if (recv(new_fd, &clientRequest, (sizeof(void) * 1024), 0) == -1)
+        {
+            perror("Err! Bad request\n");
+            printf("error, bad request! on command? \n");
+        }
+        else
+        {
+            printf("SERVER: successfully receive client command [userInput]! %s \n", clientRequest);
+        }
+
+        if (recv(new_fd, &channel_id, (sizeof(int)), 0) == -1)
+        {
+            perror("Err! Bad request on channel id?\n");
+            printf("error, bad request! \n");
+        }
+        else
+        {
+            printf("SERVER: sucessfully received client channel_id! [channel_id] %d\n", channel_id);
+        }
+
         close(new_fd);
         exit(0);
-
         // close(new_fd); /* parent doesn't need this */
 
         // while (waitpid(-1, NULL, WNOHANG) > 0)

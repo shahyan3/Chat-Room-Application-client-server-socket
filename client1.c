@@ -53,6 +53,28 @@ void display_menu()
     printf("\nType Command: ");
 }
 
+// Client requests to subscribe to channel
+// PARAM: channel id
+// RETURN: 0 = success, -1 failed request
+int subscribeReq(void *commandInput, int channel_id, int sock_id)
+{
+    if (send(sock_id, commandInput, sizeof(void) * 10, 0) == -1)
+    {
+        perror("CLIENT: request to server failed [commandInput]...");
+        return -1;
+    }
+    else
+    {
+        if (send(sock_id, &channel_id, sizeof(int), 0) == -1)
+        {
+            perror("CLIENT: request to server failed [channel_id]");
+            return -1;
+        }
+    }
+
+    return 1;
+}
+
 int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED? */
 {
     char buff[SERVER_ON_CONNECT_MSG_SIZE];
@@ -113,8 +135,10 @@ int main(int argc, char *argv[])
     int *id_ptr = &id_inputted; /* Pointer to user inputted channel id*/
 
     char command_input[10]; /* User inputted command i.e. SUB, NEXT etc. */
+    char *command_input_ptr = command_input;
 
     char user_input[20]; /* user input */
+    char *user_input_ptr = user_input;
 
     display_menu();
 
@@ -134,6 +158,16 @@ int main(int argc, char *argv[])
         { // User enters SUB <channel id>
 
             printf("\n%s  %d\n", command_input, id_inputted);
+
+            if (subscribeReq(command_input_ptr, id_inputted, sockfd) == -1)
+            {
+                printf("ERROR!!!! subcribe request failed");
+            }
+            else
+            {
+                printf("successly sent request to server...");
+            }
+
             id_inputted = RESET_TO_ZERO;
 
             printf("\nType Command: ");
