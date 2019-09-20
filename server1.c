@@ -26,6 +26,13 @@
 
 #define RETURNED_ERROR -1
 
+typedef struct client_request
+{
+    int channelid;
+    char command;
+
+} client_request;
+
 /*
     FUNCTION: deal elegantly with any threads that have been created as well as any open sockets, shared memory regions,
 dynamically allocated memory and/or open files. 
@@ -44,27 +51,31 @@ void shut_down_handler()
     exit(1);
 }
 
-int *Receive_Array_Int_Data(int socket_identifier, int size)
-{
-    int number_of_bytes, i = 0;
-    uint16_t statistics;
+void handleClientRequests(int new_fd);
 
-    int *results = malloc(sizeof(int) * size);
-    for (i = 0; i < size; i++)
-    {
-        if ((number_of_bytes = recv(socket_identifier, &statistics, sizeof(uint16_t), 0)) == RETURNED_ERROR)
-        {
-            perror("recv");
-            exit(EXIT_FAILURE);
-        }
-        results[i] = ntohs(statistics);
-    }
-    return results;
-}
+// int *Receive_Array_Int_Data(int socket_identifier, int size)
+// {
+//     int number_of_bytes, i = 0;
+//     uint16_t statistics;
+
+//     int *results = malloc(sizeof(int) * size);
+//     for (i = 0; i < size; i++)
+//     {
+//         if ((number_of_bytes = recv(socket_identifier, &statistics, sizeof(uint16_t), 0)) == RETURNED_ERROR)
+//         {
+//             perror("recv");
+//             exit(EXIT_FAILURE);
+//         }
+//         results[i] = ntohs(statistics);
+//     }
+//     return results;
+// }
 
 int main(int argc, char *argv[])
 {
     int port = 12345;
+
+    // client_request *clientRequest;
 
     // signal handling
     struct sigaction sa;
@@ -115,15 +126,17 @@ int main(int argc, char *argv[])
     printf("server starts listening on %d...\n", port);
 
     /* repeat: accept, send, close the connection */
-    while (1)
-    { /* main accept() loop */
-        sin_size = sizeof(struct sockaddr_in);
-        if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr,
-                             &sin_size)) == -1)
-        {
-            perror("accept");
-            continue;
-        }
+    sin_size = sizeof(struct sockaddr_in);
+    while (new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size))
+    {
+        // { /* main accept() loop */
+        //     sin_size = sizeof(struct sockaddr_in);
+        //     if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr,
+        //                          &sin_size)) == -1)
+        //     {
+        //         perror("accept");
+        //         continue;
+        //     }
         printf("server: got connection from %s\n",
                inet_ntoa(their_addr.sin_addr));
 
@@ -134,33 +147,32 @@ int main(int argc, char *argv[])
             perror("send");
 
         // Receive client request
-        char clientRequest[1024];
-        int channel_id;
-        if (recv(new_fd, &clientRequest, (sizeof(void) * 1024), 0) == -1)
-        {
-            perror("Err! Bad request\n");
-            printf("error, bad request! on command? \n");
-        }
-        else
-        {
-            printf("SERVER: successfully receive client command [userInput]! %s \n", clientRequest);
-        }
+        handleClientRequests(new_fd);
 
-        if (recv(new_fd, &channel_id, (sizeof(int)), 0) == -1)
-        {
-            perror("Err! Bad request on channel id?\n");
-            printf("error, bad request! \n");
-        }
-        else
-        {
-            printf("SERVER: sucessfully received client channel_id! [channel_id] %d\n", channel_id);
-        }
-
-        close(new_fd);
-        exit(0);
+        // close(new_fd);
+        // exit(0);
         // close(new_fd); /* parent doesn't need this */
 
         // while (waitpid(-1, NULL, WNOHANG) > 0)
         //     ; /* clean up child processes */
+    }
+
+    close(new_fd);
+    exit(0);
+}
+
+void handleClientRequests(int new_fd)
+{
+    // char clientRequest[1024];
+
+    // client_request clientRequest;
+
+    int req;
+
+    while (recv(new_fd, clientRequest, (sizeof(void) * 1024), 0))
+    {
+        // sscanf(user_input, "%s", command_input, id_ptr);
+
+        printf("\nSERVER: successfully receive client command [userInput]! %d", clientRequest->channelid);
     }
 }

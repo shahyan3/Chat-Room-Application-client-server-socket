@@ -21,6 +21,13 @@
 
 #define ARRAY_SIZE 30
 
+typedef struct server_request
+{
+    int channelid;
+    char command;
+
+} server_request;
+
 // void Send_Array_Data(int socket_id, int *myArray)
 // {
 //     int i = 0;
@@ -56,23 +63,16 @@ void display_menu()
 // Client requests to subscribe to channel
 // PARAM: channel id
 // RETURN: 0 = success, -1 failed request
-int subscribeReq(void *commandInput, int channel_id, int sock_id)
+int subscribeReq(server_request serverRequest, int channel_id, int sock_id)
 {
-    if (send(sock_id, commandInput, sizeof(void) * 10, 0) == -1)
+
+    if (send(sock_id, &serverRequest, sizeof(server_request), 0) == -1)
     {
         perror("CLIENT: request to server failed [commandInput]...");
         return -1;
     }
-    else
-    {
-        if (send(sock_id, &channel_id, sizeof(int), 0) == -1)
-        {
-            perror("CLIENT: request to server failed [channel_id]");
-            return -1;
-        }
-    }
 
-    return 1;
+    return 1; // requests successful.
 }
 
 int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED? */
@@ -91,6 +91,9 @@ int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED
 
 int main(int argc, char *argv[])
 {
+
+    server_request serverRequest;
+
     int sockfd, i = 0;
     struct hostent *he;
     struct sockaddr_in their_addr; /* connector's address information */
@@ -144,8 +147,13 @@ int main(int argc, char *argv[])
 
     while (fgets(user_input, 20, stdin))
     {
-        sscanf(user_input, "%s %d", command_input, id_ptr);
-        // printf("%s %d\n", command_input, id_inputted);
+        sscanf(user_input, "%s%d", command_input, id_ptr);
+
+        // for (i = 0; i < strlen(user_input); i++)
+        // {
+        //     printf("->%c", user_input[i]);
+        // }
+        // printf("==> %s %d\n", , user_input[1]);
 
         // User enters OPTION:
         if (strncmp(command_input, "OPTIONS", strlen("OPTIONS")) == 0)
@@ -156,16 +164,18 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // User enters SUB <channel id>
-
             printf("\n%s  %d\n", command_input, id_inputted);
 
-            if (subscribeReq(command_input_ptr, id_inputted, sockfd) == -1)
+            serverRequest.channelid = id_inputted;
+            // serverRequest.command = command_input;
+
+            if (subscribeReq(serverRequest, id_inputted, sockfd) == -1)
             {
-                printf("ERROR!!!! subcribe request failed");
+                printf("Client: Error, subscribe request to server failed\n");
             }
             else
             {
-                printf("successly sent request to server...");
+                printf("Client: Successfully send subscribe request to server...\n");
             }
 
             id_inputted = RESET_TO_ZERO;
@@ -193,7 +203,6 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // // User enters UNSUB <channel id>
-
             printf("\n%s  %d\n", command_input, id_inputted);
             id_inputted = RESET_TO_ZERO;
 
@@ -225,7 +234,6 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // // User enters LIVEFEED <channel id>
-
             printf("\n WITH ID %s  %d\n", command_input, id_inputted);
             id_inputted = RESET_TO_ZERO;
 
@@ -250,7 +258,6 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // // User enters NEXT <channel id>
-
             printf("\n WITH ID %s  %d\n", command_input, id_inputted);
             id_inputted = RESET_TO_ZERO;
 
@@ -268,7 +275,6 @@ int main(int argc, char *argv[])
 
         else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
         { // // User enters BYE
-
             printf("\n %s \n", command_input);
             printf("\n BYE BYE! \n");
             id_inputted = RESET_TO_ZERO;
