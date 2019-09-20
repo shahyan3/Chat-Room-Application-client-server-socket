@@ -21,13 +21,6 @@
 
 #define ARRAY_SIZE 30
 
-typedef struct server_request
-{
-    int channelid;
-    char command;
-
-} server_request;
-
 // void Send_Array_Data(int socket_id, int *myArray)
 // {
 //     int i = 0;
@@ -63,10 +56,10 @@ void display_menu()
 // Client requests to subscribe to channel
 // PARAM: channel id
 // RETURN: 0 = success, -1 failed request
-int subscribeReq(server_request serverRequest, int channel_id, int sock_id)
+int subscribeReq(char *user_input_ptr, int channel_id, int sock_id)
 {
 
-    if (send(sock_id, &serverRequest, sizeof(server_request), 0) == -1)
+    if (send(sock_id, user_input_ptr, sizeof(char) * 1024, 0) == -1)
     {
         perror("CLIENT: request to server failed [commandInput]...");
         return -1;
@@ -91,8 +84,6 @@ int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED
 
 int main(int argc, char *argv[])
 {
-
-    server_request serverRequest;
 
     int sockfd, i = 0;
     struct hostent *he;
@@ -166,10 +157,7 @@ int main(int argc, char *argv[])
         { // User enters SUB <channel id>
             printf("\n%s  %d\n", command_input, id_inputted);
 
-            serverRequest.channelid = id_inputted;
-            // serverRequest.command = command_input;
-
-            if (subscribeReq(serverRequest, id_inputted, sockfd) == -1)
+            if (subscribeReq(user_input_ptr, id_inputted, sockfd) == -1)
             {
                 printf("Client: Error, subscribe request to server failed\n");
             }

@@ -25,14 +25,6 @@
 #define BACKLOG 10 /* how many pending connections queue will hold */
 
 #define RETURNED_ERROR -1
-
-typedef struct client_request
-{
-    int channelid;
-    char command;
-
-} client_request;
-
 /*
     FUNCTION: deal elegantly with any threads that have been created as well as any open sockets, shared memory regions,
 dynamically allocated memory and/or open files. 
@@ -52,6 +44,8 @@ void shut_down_handler()
 }
 
 void handleClientRequests(int new_fd);
+
+int parseRequest(char *clientRequest, char *user_command, char *channel_id);
 
 // int *Receive_Array_Int_Data(int socket_identifier, int size)
 // {
@@ -74,8 +68,6 @@ void handleClientRequests(int new_fd);
 int main(int argc, char *argv[])
 {
     int port = 12345;
-
-    // client_request *clientRequest;
 
     // signal handling
     struct sigaction sa;
@@ -163,16 +155,60 @@ int main(int argc, char *argv[])
 
 void handleClientRequests(int new_fd)
 {
-    // char clientRequest[1024];
+    char clientRequest[1024];
 
-    // client_request clientRequest;
+    char *string_ptr;
+    char delim[] = " ";
 
-    int req;
+    char user_command[100], channel_id[64];
 
-    while (recv(new_fd, clientRequest, (sizeof(void) * 1024), 0))
+    while (recv(new_fd, clientRequest, (sizeof(char) * 1024), 0))
     {
-        // sscanf(user_input, "%s", command_input, id_ptr);
+        // string_ptr = strtok(clientRequest, delim);
 
-        printf("\nSERVER: successfully receive client command [userInput]! %d", clientRequest->channelid);
+        // strcpy(user_command, string_ptr);
+        // printf("%s", user_command);
+        // string_ptr = strtok(NULL, delim);
+
+        // strcpy(channel_id, string_ptr);
+        // printf("%s", channel_id);
+        // string_ptr = strtok(NULL, delim);
+
+        if (parseRequest(clientRequest, user_command, channel_id) == 0)
+        {
+            printf("\nResult:%s\n", user_command);
+            printf("\nResult:%d\n", atoi(channel_id));
+
+            printf("\nSERVER: successfully receive client command [userInput]!");
+        }
+        else
+        {
+            printf("\nSERVER: Error, failed to parse client command");
+            perror("\nSERVER: Error, failed to parse client command");
+        }
+
+        //
+        // if (strncmp(user_command, "SUB", strlen("SUB")) == 0 && channel_id)
+        // {
+        //     printf("\nsucribe() now");
+        // }
     }
+}
+
+int parseRequest(char *clientRequest, char *user_command, char *channel_id)
+{
+    char *string_ptr;
+    char delim[] = " ";
+
+    string_ptr = strtok(clientRequest, delim);
+
+    strcpy(user_command, string_ptr);
+    // printf("%s", user_command);
+    string_ptr = strtok(NULL, delim);
+
+    strcpy(channel_id, string_ptr);
+    // printf("%s", channel_id);
+    string_ptr = strtok(NULL, delim);
+
+    return 0;
 }
