@@ -70,16 +70,17 @@ int subscribeReq(char *user_input_ptr, int channel_id, int sock_id)
 
 int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED? */
 {
-    char buff[SERVER_ON_CONNECT_MSG_SIZE];
+    // char buff[SERVER_ON_CONNECT_MSG_SIZE];
+    int clientID;
 
     int number_of_bytes;
-    if ((number_of_bytes = recv(sock_id, buff, sizeof(char) * SERVER_ON_CONNECT_MSG_SIZE, 0)) == RETURNED_ERROR)
+    if ((number_of_bytes = recv(sock_id, &clientID, sizeof(int), 0)) == RETURNED_ERROR)
     {
         perror("recv");
         exit(EXIT_FAILURE);
     }
 
-    printf("\n%s", buff);
+    printf("Welcome! Your client ID is %d\n", clientID);
 }
 
 int main(int argc, char *argv[])
