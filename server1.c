@@ -166,6 +166,81 @@ void subscribe(client_t *client, int channel_id)
     }
 }
 
+client_t *findSubsriberInList(channel_t *channel, int clientID)
+{
+    client_t *client = NULL;
+    client_t *subHead = channel->subscriberHead;
+
+    if (subHead == NULL)
+    {
+        printf("no subscriber in the list\n");
+    }
+
+    while (subHead != NULL)
+    {
+        if (subHead->clientID == clientID)
+        {
+            client = subHead;
+            break;
+        }
+        subHead = subHead->next;
+    }
+    return subHead;
+}
+
+void updateUnreadMsgCountForSubscribers(channel_t *channel)
+{
+    client_t *currentNode = channel->subscriberHead;
+    if (currentNode == NULL)
+    {
+        printf("Error, no subscribers found in channel");
+    }
+    while (currentNode != NULL)
+    {
+        currentNode->unReadMsg += 1;
+        currentNode = currentNode->next;
+    }
+}
+
+void writeToChannelReq(int clientID, int channelID, message_t *newMessage)
+{
+    message_t *tailMsg;
+    client_t *client;
+    channel_t *channel;
+    int i = 0;
+
+    // hostedChannels.forEach(channel = > {
+    for (i = 0; i < MAX_CHANNELS; i++)
+    {
+        if (hostedChannels[i].channelID == channelID)
+        {
+            channel = &hostedChannels[i];
+
+            // channel exists
+            client = findSubsriberInList(channel, clientID);
+            if (client->clientID == clientID)
+            {
+                // client is subscribed to channel
+                // critical section ?
+                tailMsg = channel->messageHead;
+                channel->messageHead = newMessage;
+                channel->messageHead->next = tailMsg;
+
+                // works: update unreadMsg property for all subcribed clients except client with this clientID
+                updateUnreadMsgCountForSubscribers(channel);
+
+                // update total msg count for channel.totalMessages
+                channel->totalMsg += 1;
+                // end of critical section ?
+            }
+            else
+            {
+                printf("Error: no client subscribed to the channel \n");
+            }
+        }
+    }
+}
+
 /*
     END OF
 */
@@ -262,13 +337,12 @@ int main(int argc, char *argv[])
         }
 
         /* create message */
-        // char *msg = "This is message 1\0"; // USE MALLOC SO ITS ON HEAP, FOR EACH THREAD ACCESS, AND ENSRUE 1024 SIZE ??
-        // Create a message
-        // message_t message1;
-        // message1.messageID = 1;
-        // message1.ownerID = 1;
-        // strcpy(message1.content, msg);
-        // message1.next = NULL;
+        char *msg = "This is message 1\0"; // USE MALLOC SO ITS ON HEAP, FOR EACH THREAD ACCESS, AND ENSRUE 1024 SIZE ??
+        message_t message1;
+        message1.messageID = 1;
+        message1.ownerID = 1;
+        strcpy(message1.content, msg);
+        message1.next = NULL;
 
         // Create a channel
         channel_t channel1;
@@ -304,7 +378,13 @@ int main(int argc, char *argv[])
 
                 // // handle client request
                 handleClientRequests(user_command, channel_id, &client);
-                // handleClientRequests(user_command, channel_id, &client2);
+
+                /*******************************sdgdsfgafsgdafsdafssd herereee */
+                // if (strncmp(user_command, "SEND", strlen("SEND")) == 0 && channel_id)
+                // {
+                //     printf("sending...message \n");
+                //     writeToChannelReq(client.clientID, atoi(channel_id), &message1);
+                // }
 
                 printf("SERVER: successfully receive client command [userInput]!\n");
             }
@@ -328,6 +408,7 @@ void handleClientRequests(char *user_command, char *channel_id, client_t *client
 
     int channelID = atoi(channel_id);
     printf("CHANEEEL ID IS: %d\n", channelID);
+
     char userCommand = *user_command;
 
     if (strncmp(user_command, "SUB", strlen("SUB")) == 0 && channel_id)
@@ -368,6 +449,13 @@ void handleClientRequests(char *user_command, char *channel_id, client_t *client
             printf("$$$ Subcriber 2: messageQueueIndex = %d\n", hostedChannels[0].subscriberHead->next->messageQueueIndex);
         }
     }
+
+    // ****************** here,,,,,
+    // else if (strncmp(user_command, "SEND", strlen("SEND")) == 0 && channel_id)
+    // {
+    //     // printf("sending...message \n");
+    //     // writeToChannelReq(client->clientID, channelID, );
+    // }
 }
 
 int parseRequest(int new_fd, char *clientRequest, char *user_command, char *channel_id)
