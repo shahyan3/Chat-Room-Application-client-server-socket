@@ -93,26 +93,25 @@ message_t *findLastMsgInLinkedList(channel_t channel)
     return lastMsgInList;
 }
 
-// subscribe client to channel
 void subscribe(client_t *client, int channel_id)
 {
     int i = 0;
-    channel_t channel;
+    channel_t *channel;
     client_t *currentNode;
     message_t *message;
 
-    for (i = 0; i < 5; i++)
+    for (i = 0; i < MAX_CHANNELS; i++)
     {
         if (hostedChannels[i].channelID == channel_id)
         {
-            printf("Channel selected found: %d\n", hostedChannels[i].channelID);
-            channel = hostedChannels[i];
-            currentNode = channel.subscriberHead;
+            printf("\n\nChannel selected found: %d\n", hostedChannels[i].channelID);
+            channel = &hostedChannels[i];
+            currentNode = channel->subscriberHead;
 
-            if (channel.subscriberHead == NULL)
+            if (channel->subscriberHead == NULL)
             {
                 printf("Selected channels subscriberHead is NULL\n");
-                message = findLastMsgInLinkedList(channel);
+                message = findLastMsgInLinkedList(*channel);
 
                 // message == null ? client.messageQueueIndex = 0 : client.messageQueueIndex = message.messageID;
                 if (message == NULL)
@@ -127,15 +126,15 @@ void subscribe(client_t *client, int channel_id)
                     client->messageQueueIndex = message->messageID;
                 }
 
-                client->messageQueueIndex = channel.totalMsg;
-                client->entryIndexConstant = channel.totalMsg; // assign entry index based on msg in list constant
-                printf("....\n");
-                channel.subscriberHead = client;
-                channel.subscriberTail = channel.subscriberHead; // track the last node
-                printf("CHANNEL SUBSCRIBER HEAD clinet id = %d\n", channel.subscriberHead->clientID);
+                client->messageQueueIndex = channel->totalMsg;
+                client->entryIndexConstant = channel->totalMsg; // assign entry index based on msg in list constant
+                channel->subscriberHead = client;
+                channel->subscriberTail = channel->subscriberHead; // track the last node
+                printf("CHANNEL SUBSCRIBER HEAD clinet id = %d\n", channel->subscriberHead->clientID);
             }
             else
             {
+                printf("~~~~~~~~~~~~~~~~~~~\n");
 
                 printf("Selected channels subscriberHead is NOT NULL\n");
 
@@ -144,20 +143,20 @@ void subscribe(client_t *client, int channel_id)
                     // if the next value null = last node
                     currentNode = currentNode->next;
                 }
-                message = findLastMsgInLinkedList(channel);
+                message = findLastMsgInLinkedList(*channel);
                 // update the read message queue index for the above message read.
                 // works too! message == null ? client.messageQueueIndex = 0 : client.messageQueueIndex = message.messageID;
-                client->messageQueueIndex = channel.totalMsg;
+                client->messageQueueIndex = channel->totalMsg;
 
-                channel.totalMsg = channel.totalMsg;
+                channel->totalMsg = channel->totalMsg;
 
                 // assign the index value of the last msg as subbed entry (never changes!)
-                client->entryIndexConstant = channel.totalMsg;
+                client->entryIndexConstant = channel->totalMsg;
 
-                currentNode->next = client;                 // on the last node add next client
-                channel.subscriberTail = currentNode->next; // track the last node
+                currentNode->next = client;                  // on the last node add next client
+                channel->subscriberTail = currentNode->next; // track the last node
 
-                printf("..CHANNEL SUBSCRIBER HEAD clinet id = %d\n", channel.subscriberHead->clientID);
+                printf("..CHANNEL SUBSCRIBER HEAD clinet id = %d\n", channel->subscriberHead->next->clientID);
             }
         }
         else
@@ -184,7 +183,10 @@ void shut_down_handler()
     exit(1);
 }
 
-void handleClientRequests(char *user_command, char *channel_id, int clientID);
+int create_client();
+
+void handleClientRequests(char *user_command, char *channel_id, client_t *client);
+
 int randomClientIdGenerator();
 
 int parseRequest(int new_fd, char *clientRequest, char *user_command, char *channel_id);
@@ -251,40 +253,22 @@ int main(int argc, char *argv[])
         /* ***Server-Client Connected*** */
 
         printf("\n-------------------------------------------\n");
+        // Create a new client object
+        client_t client;
+        if (create_client(&client) == 1)
+        {
+            perror("SERVER: failed to create client object\n");
+            printf("SERVER: failed to create client object\n");
+        }
 
-        int clientID; /* client id given to each connected client */
-        clientID = randomClientIdGenerator();
-
-        /* */
-        char *msg = "This is message 1\0"; // USE MALLOC SO ITS ON HEAP, FOR EACH THREAD ACCESS, AND ENSRUE 1024 SIZE ??
-
+        /* create message */
+        // char *msg = "This is message 1\0"; // USE MALLOC SO ITS ON HEAP, FOR EACH THREAD ACCESS, AND ENSRUE 1024 SIZE ??
         // Create a message
-        message_t message1;
-        message1.messageID = 1;
-        message1.ownerID = 1;
-        strcpy(message1.content, msg);
-        message1.next = NULL;
-
-        // Create a client 1
-        client_t client1;
-
-        client1.clientID = clientID;
-        client1.readMsg = 0;
-        client1.unReadMsg = 0;
-        client1.totalMessageSent = 0;
-        client1.entryIndexConstant = 0;
-        client1.messageQueueIndex = 0;
-        client1.next = NULL;
-
-        client_t client2;
-
-        client2.clientID = 2;
-        client2.readMsg = 0;
-        client2.unReadMsg = 0;
-        client2.totalMessageSent = 0;
-        client2.entryIndexConstant = 0;
-        client2.messageQueueIndex = 0;
-        client2.next = NULL;
+        // message_t message1;
+        // message1.messageID = 1;
+        // message1.ownerID = 1;
+        // strcpy(message1.content, msg);
+        // message1.next = NULL;
 
         // Create a channel
         channel_t channel1;
@@ -299,16 +283,10 @@ int main(int argc, char *argv[])
 
         // printf("Hosted Channel %d\n", hostedChannels[0].channelID);
 
-        subscribe(&client1, 1);
-
-        subscribe(&client2, 1);
-
-        printf("Subcriber 1: id = %d\n", hostedChannels[0].subscriberHead->clientID);
-
         printf("\n-------------------------------------------\n");
 
         // Send: Welcome Message.
-        if (send(new_fd, &clientID, sizeof(int), 0) == -1)
+        if (send(new_fd, &client.clientID, sizeof(int), 0) == -1)
         {
             perror("send");
         }
@@ -325,7 +303,9 @@ int main(int argc, char *argv[])
             {
 
                 // // handle client request
-                handleClientRequests(user_command, channel_id, clientID);
+                handleClientRequests(user_command, channel_id, &client);
+                // handleClientRequests(user_command, channel_id, &client2);
+
                 printf("SERVER: successfully receive client command [userInput]!\n");
             }
             else
@@ -340,19 +320,53 @@ int main(int argc, char *argv[])
     exit(0);
 }
 
-void handleClientRequests(char *user_command, char *channel_id, int clientID)
+void handleClientRequests(char *user_command, char *channel_id, client_t *client)
 {
     // printf("\nResult:%s\n", user_command);
     // printf("Result:%d\n", atoi(channel_id));
     // printf("handleing request now...\n");
 
     int channelID = atoi(channel_id);
+    printf("CHANEEEL ID IS: %d\n", channelID);
     char userCommand = *user_command;
 
     if (strncmp(user_command, "SUB", strlen("SUB")) == 0 && channel_id)
     {
         printf("\nSucribe() now to channel %d with %s command.\n", channelID, user_command);
-        // subscribe(&client1, channelID);
+
+        subscribe(client, channelID);
+
+        /* FAKE client2*/
+        client_t client2;
+
+        client2.clientID = 2;
+        client2.readMsg = 0;
+        client2.unReadMsg = 0;
+        client2.totalMessageSent = 0;
+        client2.entryIndexConstant = 0;
+        client2.messageQueueIndex = 0;
+        client2.next = NULL;
+
+        subscribe(&client2, channelID);
+
+        if (hostedChannels[0].subscriberHead == NULL)
+
+        {
+            printf("\n->NULL\n");
+        }
+        else
+        {
+            printf("NOT NULL\n");
+            printf("\n======================================\n");
+            printf("$$$ Subcriber 1: id = %d\n", hostedChannels[0].subscriberHead->clientID);
+            printf("$$$ Subcriber 1: entryIndexConstant = %d\n", hostedChannels[0].subscriberHead->entryIndexConstant);
+            printf("$$$ Subcriber 1: messageQueueIndex = %d\n", hostedChannels[0].subscriberHead->messageQueueIndex);
+
+            printf("\n======================================\n");
+            printf("## Subcriber 2: id = %d\n", hostedChannels[0].subscriberHead->next->clientID);
+            printf("$$$ Subcriber 2: entryIndexConstant = %d\n", hostedChannels[0].subscriberHead->next->entryIndexConstant);
+            printf("$$$ Subcriber 2: messageQueueIndex = %d\n", hostedChannels[0].subscriberHead->next->messageQueueIndex);
+        }
     }
 }
 
@@ -379,6 +393,30 @@ int randomClientIdGenerator()
     int num = rand() % MAX_CLIENTS;
 
     return num;
+}
+
+int create_client(client_t *client)
+{
+
+    int clientID; /* client id given to each connected client */
+    clientID = randomClientIdGenerator();
+
+    client->clientID = clientID;
+    client->readMsg = 0;
+    client->unReadMsg = 0;
+    client->totalMessageSent = 0;
+    client->entryIndexConstant = 0;
+    client->messageQueueIndex = 0;
+    client->next = NULL;
+
+    if (&client->clientID != NULL)
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
 
 // int *Receive_Array_Int_Data(int socket_identifier, int size)
