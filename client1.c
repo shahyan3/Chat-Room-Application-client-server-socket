@@ -21,72 +21,57 @@
 
 #define ARRAY_SIZE 30
 
-// void Send_Array_Data(int socket_id, int *myArray)
-// {
-//     int i = 0;
-//     uint16_t statistics;
-//     for (i = 0; i < ARRAY_SIZE; i++)
-//     {
-//         statistics = htons(myArray[i]);
-//         send(socket_id, &statistics, sizeof(uint16_t), 0);
-//     }
-// }
+#define MAX_MESSAGE_LENGTH 1024
 
-// convert into function 0 - shows commands and nums
+/* COMMANDS */
+#define SUB 0
+#define UNSUB 1
+#define NEXT 2
+#define LIVEFEED 3
+#define SEND 4
 
-void display_options()
+/*
+    STRUCTS
+*/
+
+typedef struct request request_t;
+
+typedef struct message message_t;
+
+struct message
 {
-    printf("\nUsage: \n");
-    printf("\n SUB <channelid>               :  Subcribe to chanenel \n");
-    printf("\n UNSUB <channelid>             :  Unsubcribe to chanenel \n");
-    printf("\n NEXT <channelid>              :  Display the next unread message with given ID \n");
-    printf("\n LIVEFEED <channelid>          :  Display all unread messages continuously with given ID \n");
-    printf("\n NEXT                          :  Display the next unread message from all channels \n");
-    printf("\n LIVEFEED <channelid>          :  Display all unread messages continuously from all channels \n");
-    printf("\n NEXT <channelid>              :  Display the next unread message with given ID \n");
-    printf("\n SEND <channelid> <message>    :  Send a new message to given channel ID \n");
-    printf("\n BYE                           :  Shutdown connection \n");
-}
-void display_menu()
+    int ownerID;
+    char content[MAX_MESSAGE_LENGTH];
+    message_t *next;
+};
+struct request
 {
-    printf("\n See Usage type [OPTIONS]\n");
-    printf("\nType Command: ");
-}
-
-// Client requests to subscribe to channel
-// PARAM: channel id
-// RETURN: 0 = success, -1 failed request
-int subscribeReq(char *user_input_ptr, int channel_id, int sock_id)
-{
-
-    if (send(sock_id, user_input_ptr, sizeof(char) * 1024, 0) == -1)
-    {
-        perror("CLIENT: request to server failed [commandInput]...");
-        return -1;
-    }
-
-    return 1; // requests successful.
-}
-
-int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED? */
-{
-    // char buff[SERVER_ON_CONNECT_MSG_SIZE];
+    int commandID; /* integer enum representing command i.e. SUB, NEXT*/
+    int channelID;
     int clientID;
+    char message[MAX_MESSAGE_LENGTH];
+    // message_t message;
+};
 
-    int number_of_bytes;
-    if ((number_of_bytes = recv(sock_id, &clientID, sizeof(int), 0)) == RETURNED_ERROR)
-    {
-        perror("recv");
-        exit(EXIT_FAILURE);
-    }
+/*
+    FUNCTIONS
+*/
+void display_options();
 
-    printf("Welcome! Your client ID is %d\n", clientID);
-}
+void display_menu();
+
+int sendRequest(request_t clientRequest, int sock_id);
+
+request_t createRequest(int command, int channel_id, int clientID, char *message);
+
+int connection_success(int sock_id);
 
 int main(int argc, char *argv[])
 {
 
     int sockfd, i = 0;
+    int *client;
+    request_t *clientRequest;
     struct hostent *he;
     struct sockaddr_in their_addr; /* connector's address information */
 
@@ -123,7 +108,8 @@ int main(int argc, char *argv[])
     /* **!**CLIENT-SERVER***!** */
 
     /* Receive message back from server */
-    connection_success(sockfd);
+    int clientID = connection_success(sockfd);
+    // printf("checking client id %d", clientID);
 
     int id_inputted = RESET_TO_ZERO;
 
@@ -135,17 +121,14 @@ int main(int argc, char *argv[])
     char user_input[20]; /* user input */
     char *user_input_ptr = user_input;
 
+    char message[MAX_MESSAGE_LENGTH];
+    char *user_msg_ptr = message;
+
     display_menu();
 
     while (fgets(user_input, 20, stdin))
     {
-        sscanf(user_input, "%s%d", command_input, id_ptr);
-
-        // for (i = 0; i < strlen(user_input); i++)
-        // {
-        //     printf("->%c", user_input[i]);
-        // }
-        // printf("==> %s %d\n", , user_input[1]);
+        sscanf(user_input, "%s%d%s", command_input, id_ptr, user_msg_ptr);
 
         // User enters OPTION:
         if (strncmp(command_input, "OPTIONS", strlen("OPTIONS")) == 0)
@@ -156,15 +139,16 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // User enters SUB <channel id>
-            printf("\n%s  %d\n", command_input, id_inputted);
 
-            if (subscribeReq(user_input_ptr, id_inputted, sockfd) == -1)
+            request_t request = createRequest(SUB, id_inputted, clientID, NULL);
+
+            if (sendRequest(request, sockfd) == 1)
             {
                 printf("Client: Error, subscribe request to server failed\n");
             }
             else
             {
-                printf("Client: Successfully send subscribe request to server...\n");
+                printf("\nClient: Successfully send subscribe request to server...\n");
             }
 
             id_inputted = RESET_TO_ZERO;
@@ -271,6 +255,32 @@ int main(int argc, char *argv[])
             sleep(1);
             exit(1);
         }
+
+        else if (strncmp(command_input, "SEND", strlen("SEND")) == 0 &&
+                 id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        { // User enters SEND<channelid><message>
+
+            char *message_content;
+            strcpy(message_content, "THIS IS A MESSAGE");
+
+            printf("\n%s  %d \n%s\n", command_input, id_inputted, message_content);
+
+            // Create a message obect
+            // message_t message = parseMessage();
+
+            // request_t request = createRequest(SUB, id_inputted, clientID, message);
+
+            // if (sendRequest(request, sockfd) == 1)
+            // {
+            //     printf("Client: Error, send message request to server failed\n");
+            // }
+            // else
+            // {
+            //     printf("\nClient: Successfully sent message request to server...\n");
+            // }
+
+            printf("\nType Command: ");
+        }
         else
         {
             printf("\nErr! Incorrect Input. Try again\n");
@@ -278,20 +288,87 @@ int main(int argc, char *argv[])
 
             printf("\nType Command: ");
         }
-
-        // User enters SEND <channelid> <message>
-        // if (strncmp(command_input, "SEND", strlen("SEND")) == 0 &&
-        //     id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        // {
-        // correct_input = 1;
-        //     printf("\n%s  %d\n", command_input, id_inputted);
-        // id_inputted = -1;
-        //        printf("\nType Command: ");
-
-        // }
     }
 
     close(sockfd);
 
     return 0;
+}
+
+int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED? */
+{
+    // char buff[SERVER_ON_CONNECT_MSG_SIZE];
+    int clientID;
+
+    int number_of_bytes;
+    if ((number_of_bytes = recv(sock_id, &clientID, sizeof(int), 0)) == RETURNED_ERROR)
+    {
+        perror("recv");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Welcome! Your client ID is %d\n", clientID);
+
+    return clientID;
+}
+
+void display_options()
+{
+    printf("\nUsage: \n");
+    printf("\n SUB <channelid>               :  Subcribe to chanenel \n");
+    printf("\n UNSUB <channelid>             :  Unsubcribe to chanenel \n");
+    printf("\n NEXT <channelid>              :  Display the next unread message with given ID \n");
+    printf("\n LIVEFEED <channelid>          :  Display all unread messages continuously with given ID \n");
+    printf("\n NEXT                          :  Display the next unread message from all channels \n");
+    printf("\n LIVEFEED <channelid>          :  Display all unread messages continuously from all channels \n");
+    printf("\n NEXT <channelid>              :  Display the next unread message with given ID \n");
+    printf("\n SEND <channelid> <message>    :  Send a new message to given channel ID \n");
+    printf("\n BYE                           :  Shutdown connection \n");
+}
+void display_menu()
+{
+    printf("\n See Usage type [OPTIONS]\n");
+    printf("\nType Command: ");
+}
+
+// Creates a request object and checks if message included or not
+request_t createRequest(int command, int channel_id, int clientID, char *message)
+{
+
+    request_t clientRequest;
+
+    clientRequest.commandID = command;
+    clientRequest.channelID = channel_id;
+    clientRequest.clientID = clientID;
+
+    // If message inputted, assign to the request struct
+    if (&message[0] != NULL)
+    {
+        printf("REQ HAS MSG: %s\n", message);
+
+        strcpy(clientRequest.message, message);
+    }
+    else
+    {
+        printf("no message found\n");
+    }
+
+    printf("\n Client Request Object:\n command id %d\n channel id %d \n client id %d\n client message %s\n",
+           clientRequest.commandID, clientRequest.channelID, clientRequest.clientID, clientRequest.message);
+
+    return clientRequest;
+}
+
+// Client requests to subscribe to channel
+int sendRequest(request_t clientRequest, int sock_id)
+{
+
+    // send request to server
+    if (send(sock_id, &clientRequest, sizeof(struct request), 0) == -1)
+    {
+        perror("CLIENT: request to server failed [commandInput]...\n");
+        return 1;
+    }
+
+    return 0; // requests successful.
 }

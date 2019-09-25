@@ -32,6 +32,35 @@
 
 #define MAX_MESSAGE_LENGTH 1024
 
+/* COMMANDS */
+#define SUB 0
+#define UNSUB 1
+#define NEXT 2
+#define LIVEFEED 3
+#define SEND 4
+
+int sockfd;
+
+typedef struct message message_t;
+
+struct message
+{
+    int ownerID;
+    char content[MAX_MESSAGE_LENGTH];
+    message_t *next;
+};
+
+typedef struct request request_t;
+
+struct request
+{
+    int commandID; /* integer enum representing command i.e. SUB, NEXT*/
+    int channelID;
+    int clientID;
+    char message[MAX_MESSAGE_LENGTH];
+    // message_t message;  TODO: WORK FROM HERE
+};
+
 typedef struct client client_t;
 
 struct client
@@ -43,16 +72,6 @@ struct client
     int messageQueueIndex;  /* index = message that it read currently, NOT NEXT ONE */
     int entryIndexConstant; /* index of msg queue at which the client subed */
     client_t *next;
-};
-
-typedef struct message message_t;
-
-struct message
-{
-    int messageID;
-    int ownerID;
-    char content[MAX_MESSAGE_LENGTH];
-    message_t *next;
 };
 
 typedef struct channel channel_t;
@@ -93,153 +112,64 @@ message_t *findLastMsgInLinkedList(channel_t channel)
     return lastMsgInList;
 }
 
-void subscribe(client_t *client, int channel_id)
-{
-    int i = 0;
-    channel_t *channel;
-    client_t *currentNode;
-    message_t *message;
+void subscribe(client_t *client, int channel_id);
 
-    for (i = 0; i < MAX_CHANNELS; i++)
-    {
-        if (hostedChannels[i].channelID == channel_id)
-        {
-            printf("\n\nChannel selected found: %d\n", hostedChannels[i].channelID);
-            channel = &hostedChannels[i];
-            currentNode = channel->subscriberHead;
+client_t *findSubsriberInList(channel_t *channel, int clientID);
 
-            if (channel->subscriberHead == NULL)
-            {
-                printf("Selected channels subscriberHead is NULL\n");
-                message = findLastMsgInLinkedList(*channel);
+void print_subscribers();
 
-                // message == null ? client.messageQueueIndex = 0 : client.messageQueueIndex = message.messageID;
-                if (message == NULL)
-                {
-                    printf("message is NULL\n");
-                    client->messageQueueIndex = 0;
-                }
-                else
-                {
-                    printf("Message is NOT NULL. ");
-                    printf(" CHANNEL: messageHead id %d\n", message->messageID);
-                    client->messageQueueIndex = message->messageID;
-                }
+// void updateUnreadMsgCountForSubscribers(channel_t *channel)
+// {
+//     client_t *currentNode = channel->subscriberHead;
+//     if (currentNode == NULL)
+//     {
+//         printf("Error, no subscribers found in channel");
+//     }
+//     while (currentNode != NULL)
+//     {
+//         currentNode->unReadMsg += 1;
+//         currentNode = currentNode->next;
+//     }
+// }
 
-                client->messageQueueIndex = channel->totalMsg;
-                client->entryIndexConstant = channel->totalMsg; // assign entry index based on msg in list constant
-                channel->subscriberHead = client;
-                channel->subscriberTail = channel->subscriberHead; // track the last node
-                printf("CHANNEL SUBSCRIBER HEAD clinet id = %d\n", channel->subscriberHead->clientID);
-            }
-            else
-            {
-                printf("~~~~~~~~~~~~~~~~~~~\n");
+// void writeToChannelReq(request_t *request)
+// {
+//     message_t *tailMsg;
+//     client_t *client;
+//     channel_t *channel;
+//     int i = 0;
 
-                printf("Selected channels subscriberHead is NOT NULL\n");
+//     // hostedChannels.forEach(channel = > {
+//     for (i = 0; i < MAX_CHANNELS; i++)
+//     {
+//         if (hostedChannels[i].channelID == channelID)
+//         {
+//             channel = &hostedChannels[i];
 
-                while (currentNode->next != NULL)
-                {
-                    // if the next value null = last node
-                    currentNode = currentNode->next;
-                }
-                message = findLastMsgInLinkedList(*channel);
-                // update the read message queue index for the above message read.
-                // works too! message == null ? client.messageQueueIndex = 0 : client.messageQueueIndex = message.messageID;
-                client->messageQueueIndex = channel->totalMsg;
+//             // channel exists
+//             client = findSubsriberInList(channel, clientID);
+//             if (client->clientID == clientID)
+//             {
+//                 // client is subscribed to channel
+//                 // critical section ?
+//                 tailMsg = channel->messageHead;
+//                 channel->messageHead = newMessage;
+//                 channel->messageHead->next = tailMsg;
 
-                channel->totalMsg = channel->totalMsg;
+//                 // works: update unreadMsg property for all subcribed clients except client with this clientID
+//                 updateUnreadMsgCountForSubscribers(channel);
 
-                // assign the index value of the last msg as subbed entry (never changes!)
-                client->entryIndexConstant = channel->totalMsg;
-
-                currentNode->next = client;                  // on the last node add next client
-                channel->subscriberTail = currentNode->next; // track the last node
-
-                printf("..CHANNEL SUBSCRIBER HEAD clinet id = %d\n", channel->subscriberHead->next->clientID);
-            }
-        }
-        else
-        {
-            printf("Channel id not found\n");
-        }
-    }
-}
-
-client_t *findSubsriberInList(channel_t *channel, int clientID)
-{
-    client_t *client = NULL;
-    client_t *subHead = channel->subscriberHead;
-
-    if (subHead == NULL)
-    {
-        printf("no subscriber in the list\n");
-    }
-
-    while (subHead != NULL)
-    {
-        if (subHead->clientID == clientID)
-        {
-            client = subHead;
-            break;
-        }
-        subHead = subHead->next;
-    }
-    return subHead;
-}
-
-void updateUnreadMsgCountForSubscribers(channel_t *channel)
-{
-    client_t *currentNode = channel->subscriberHead;
-    if (currentNode == NULL)
-    {
-        printf("Error, no subscribers found in channel");
-    }
-    while (currentNode != NULL)
-    {
-        currentNode->unReadMsg += 1;
-        currentNode = currentNode->next;
-    }
-}
-
-void writeToChannelReq(int clientID, int channelID, message_t *newMessage)
-{
-    message_t *tailMsg;
-    client_t *client;
-    channel_t *channel;
-    int i = 0;
-
-    // hostedChannels.forEach(channel = > {
-    for (i = 0; i < MAX_CHANNELS; i++)
-    {
-        if (hostedChannels[i].channelID == channelID)
-        {
-            channel = &hostedChannels[i];
-
-            // channel exists
-            client = findSubsriberInList(channel, clientID);
-            if (client->clientID == clientID)
-            {
-                // client is subscribed to channel
-                // critical section ?
-                tailMsg = channel->messageHead;
-                channel->messageHead = newMessage;
-                channel->messageHead->next = tailMsg;
-
-                // works: update unreadMsg property for all subcribed clients except client with this clientID
-                updateUnreadMsgCountForSubscribers(channel);
-
-                // update total msg count for channel.totalMessages
-                channel->totalMsg += 1;
-                // end of critical section ?
-            }
-            else
-            {
-                printf("Error: no client subscribed to the channel \n");
-            }
-        }
-    }
-}
+//                 // update total msg count for channel.totalMessages
+//                 channel->totalMsg += 1;
+//                 // end of critical section ?
+//             }
+//             else
+//             {
+//                 printf("Error: no client subscribed to the channel \n");
+//             }
+//         }
+//     }
+// }
 
 /*
     END OF
@@ -252,6 +182,7 @@ void shut_down_handler()
     // close sockets
     // close(new_fd);
     // shared memory regions
+    close(sockfd);
     // free allocated memory and open files
     sleep(1);
     write(1, "\n\nShutting down gracefully, BYE!\n\n", 35);
@@ -260,7 +191,7 @@ void shut_down_handler()
 
 int create_client();
 
-void handleClientRequests(char *user_command, char *channel_id, client_t *client);
+int handleClientRequests(request_t *request, client_t *client);
 
 int randomClientIdGenerator();
 
@@ -275,7 +206,7 @@ int main(int argc, char *argv[])
     sa.sa_handler = shut_down_handler;
     sigaction(SIGINT, &sa, NULL);
 
-    int sockfd, new_fd;            /* listen on sock_fd, new connection on new_fd */
+    int new_fd;                    /* listen on sock_fd, new connection on new_fd */
     struct sockaddr_in my_addr;    /* my address information */
     struct sockaddr_in their_addr; /* connector's address information */
     socklen_t sin_size;
@@ -336,13 +267,13 @@ int main(int argc, char *argv[])
             printf("SERVER: failed to create client object\n");
         }
 
-        /* create message */
-        char *msg = "This is message 1\0"; // USE MALLOC SO ITS ON HEAP, FOR EACH THREAD ACCESS, AND ENSRUE 1024 SIZE ??
-        message_t message1;
-        message1.messageID = 1;
-        message1.ownerID = 1;
-        strcpy(message1.content, msg);
-        message1.next = NULL;
+        // /* create message */
+        // char *msg = "This is message 1\0"; // USE MALLOC SO ITS ON HEAP, FOR EACH THREAD ACCESS, AND ENSRUE 1024 SIZE ??
+        // message_t message1;
+        // message1.messageID = 1;
+        // message1.ownerID = 1;
+        // strcpy(message1.content, msg);
+        // message1.next = NULL;
 
         // Create a channel
         channel_t channel1;
@@ -354,7 +285,6 @@ int main(int argc, char *argv[])
         channel1.messageHead = NULL;
 
         hostedChannels[0] = channel1;
-
         // printf("Hosted Channel %d\n", hostedChannels[0].channelID);
 
         printf("\n-------------------------------------------\n");
@@ -365,33 +295,21 @@ int main(int argc, char *argv[])
             perror("send");
         }
 
-        char clientRequest[1024]; /* client request buffer */
+        request_t clientRequest;
 
-        // Receive: Command from User i.e. SUB, LIVEFEED etc.
-        char user_command[100], channel_id[64];
-
-        while (recv(new_fd, clientRequest, (sizeof(char) * 1024), 0))
+        while (recv(new_fd, &clientRequest, sizeof(struct request), 0))
         {
 
-            if (parseRequest(new_fd, clientRequest, user_command, channel_id) == 0)
+            if (handleClientRequests(&clientRequest, &client) == 0)
             {
+                // printf("\n SERVER: Request Object:\n command id %d\n channel id %d \n client id %d\n client message %s\n",
+                //        clientRequest.commandID, clientRequest.channelID, clientRequest.clientID, clientRequest.message);
 
-                // // handle client request
-                handleClientRequests(user_command, channel_id, &client);
-
-                /*******************************sdgdsfgafsgdafsdafssd herereee */
-                // if (strncmp(user_command, "SEND", strlen("SEND")) == 0 && channel_id)
-                // {
-                //     printf("sending...message \n");
-                //     writeToChannelReq(client.clientID, atoi(channel_id), &message1);
-                // }
-
-                printf("SERVER: successfully receive client command [userInput]!\n");
+                printf("SERVER: successfully receive client request [userInput]!\n");
             }
             else
             {
-                printf("\nSERVER: Error, failed to parse client command\n");
-                perror("\nSERVER: Error, failed to parse client command\n");
+                printf("SERVER: Error, failed to handle client request\n");
             }
         }
     }
@@ -400,64 +318,47 @@ int main(int argc, char *argv[])
     exit(0);
 }
 
-void handleClientRequests(char *user_command, char *channel_id, client_t *client)
+int handleClientRequests(request_t *request, client_t *client)
 {
-    // printf("\nResult:%s\n", user_command);
-    // printf("Result:%d\n", atoi(channel_id));
-    // printf("handleing request now...\n");
 
-    int channelID = atoi(channel_id);
-    printf("CHANEEEL ID IS: %d\n", channelID);
-
-    char userCommand = *user_command;
-
-    if (strncmp(user_command, "SUB", strlen("SUB")) == 0 && channel_id)
+    if (request->clientID != client->clientID)
     {
-        printf("\nSucribe() now to channel %d with %s command.\n", channelID, user_command);
-
-        subscribe(client, channelID);
-
-        /* FAKE client2*/
-        client_t client2;
-
-        client2.clientID = 2;
-        client2.readMsg = 0;
-        client2.unReadMsg = 0;
-        client2.totalMessageSent = 0;
-        client2.entryIndexConstant = 0;
-        client2.messageQueueIndex = 0;
-        client2.next = NULL;
-
-        subscribe(&client2, channelID);
-
-        if (hostedChannels[0].subscriberHead == NULL)
-
-        {
-            printf("\n->NULL\n");
-        }
-        else
-        {
-            printf("NOT NULL\n");
-            printf("\n======================================\n");
-            printf("$$$ Subcriber 1: id = %d\n", hostedChannels[0].subscriberHead->clientID);
-            printf("$$$ Subcriber 1: entryIndexConstant = %d\n", hostedChannels[0].subscriberHead->entryIndexConstant);
-            printf("$$$ Subcriber 1: messageQueueIndex = %d\n", hostedChannels[0].subscriberHead->messageQueueIndex);
-
-            printf("\n======================================\n");
-            printf("## Subcriber 2: id = %d\n", hostedChannels[0].subscriberHead->next->clientID);
-            printf("$$$ Subcriber 2: entryIndexConstant = %d\n", hostedChannels[0].subscriberHead->next->entryIndexConstant);
-            printf("$$$ Subcriber 2: messageQueueIndex = %d\n", hostedChannels[0].subscriberHead->next->messageQueueIndex);
-        }
+        printf("ERR! No client found. Bad request\n");
+        return 1;
     }
 
-    // ****************** here,,,,,
-    // else if (strncmp(user_command, "SEND", strlen("SEND")) == 0 && channel_id)
-    // {
-    //     // printf("sending...message \n");
-    //     // writeToChannelReq(client->clientID, channelID, );
-    // }
+    if (request->commandID == SUB && request->channelID)
+    { // Subscribe to Channel request
+
+        subscribe(client, request->channelID);
+
+        /* Fake test linked list */
+        // client_t client2;
+        // create_client(&client2);
+        // subscribe(&client2, request->channelID);
+
+        // client_t client3;
+        // create_client(&client3);
+        // subscribe(&client3, request->channelID);
+
+        // client_t client4;
+        // create_client(&client4);
+        // subscribe(&client4, request->channelID);
+
+        // print_subscribers();
+
+        /* END */
+
+        return 0;
+    }
+
+    if (request->commandID == SEND && request->channelID)
+    { // SEND message to channel
+        // writeReqToChannel(request);
+    }
 }
 
+// don't need it?
 int parseRequest(int new_fd, char *clientRequest, char *user_command, char *channel_id)
 {
     char *string_ptr;
@@ -506,21 +407,85 @@ int create_client(client_t *client)
         return 1;
     }
 }
+void print_subscribers()
+{
+    channel_t *channel = &hostedChannels[0];
 
-// int *Receive_Array_Int_Data(int socket_identifier, int size)
-// {
-//     int number_of_bytes, i = 0;
-//     uint16_t statistics;
+    client_t *subHead = channel->subscriberHead;
 
-//     int *results = malloc(sizeof(int) * size);
-//     for (i = 0; i < size; i++)
-//     {
-//         if ((number_of_bytes = recv(socket_identifier, &statistics, sizeof(uint16_t), 0)) == RETURNED_ERROR)
-//         {
-//             perror("recv");
-//             exit(EXIT_FAILURE);
-//         }
-//         results[i] = ntohs(statistics);
-//     }
-//     return results;
-// }
+    while (subHead != NULL)
+    {
+        printf("Subscriber id %d\n entryIndexQueue %d\n", subHead->clientID, subHead->entryIndexConstant);
+        subHead = subHead->next;
+    }
+
+    printf("TAIL: subscriber id %d\n", channel->subscriberTail->clientID);
+}
+
+client_t *findSubsriberInList(channel_t *channel, int clientID)
+{
+    client_t *client = NULL;
+    client_t *subHead = channel->subscriberHead;
+
+    if (subHead == NULL)
+    {
+        printf("no subscriber in the list\n");
+    }
+
+    while (subHead != NULL)
+    {
+        if (subHead->clientID == clientID)
+        {
+            client = subHead;
+            break;
+        }
+        subHead = subHead->next;
+    }
+    return subHead;
+}
+
+void subscribe(client_t *client, int channel_id)
+{
+    int i = 0;
+    channel_t *channel;
+    client_t *currentNode;
+    message_t *message;
+
+    for (i = 0; i < MAX_CHANNELS; i++)
+    {
+        if (hostedChannels[i].channelID == channel_id)
+        {
+            // printf("\n\nChannel selected found: %d\n", hostedChannels[i].channelID);
+            channel = &hostedChannels[i];
+            currentNode = channel->subscriberHead;
+
+            if (channel->subscriberHead == NULL)
+            {
+                // printf("Selected channels subscriberHead is NULL\n");
+
+                // push to linked list
+                channel->subscriberHead = client;
+                channel->subscriberTail = channel->subscriberHead; // track the last node
+                // printf("1. CHANNEL SUBSCRIBER HEAD clinet id = %d\n", channel->subscriberHead->clientID);
+            }
+            else
+            {
+                // printf("Selected channels subscriberHead is NOT NULL\n");
+
+                while (currentNode->next != NULL)
+                {
+                    // if the next value null = last node
+                    currentNode = currentNode->next;
+                }
+
+                // push to linked list
+                currentNode->next = client;                  // on the last node add next client
+                channel->subscriberTail = currentNode->next; // track the last node
+            }
+        }
+        else
+        {
+            // printf("Channel id not found\n");
+        }
+    }
+}
