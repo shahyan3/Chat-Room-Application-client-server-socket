@@ -49,8 +49,7 @@ struct request
     int commandID; /* integer enum representing command i.e. SUB, NEXT*/
     int channelID;
     int clientID;
-    char message[MAX_MESSAGE_LENGTH];
-    // message_t message;
+    message_t client_message;
 };
 
 /*
@@ -62,9 +61,11 @@ void display_menu();
 
 int sendRequest(request_t clientRequest, int sock_id);
 
-request_t createRequest(int command, int channel_id, int clientID, char *message);
+request_t createRequest(int command, int channel_id, int clientID, message_t *message);
 
 int connection_success(int sock_id);
+
+int parseUserMessage(message_t *client_message, char *user_msg_ptr, int clientID);
 
 int main(int argc, char *argv[])
 {
@@ -72,6 +73,8 @@ int main(int argc, char *argv[])
     int sockfd, i = 0;
     int *client;
     request_t *clientRequest;
+    message_t client_message;
+
     struct hostent *he;
     struct sockaddr_in their_addr; /* connector's address information */
 
@@ -121,14 +124,16 @@ int main(int argc, char *argv[])
     char user_input[20]; /* user input */
     char *user_input_ptr = user_input;
 
-    char message[MAX_MESSAGE_LENGTH];
-    char *user_msg_ptr = message;
+    // char message[MAX_MESSAGE_LENGTH];
+    char *message = (char *)malloc(sizeof(char) * MAX_MESSAGE_LENGTH);
+
+    // char *user_msg_ptr = message;
 
     display_menu();
 
     while (fgets(user_input, 20, stdin))
     {
-        sscanf(user_input, "%s%d%s", command_input, id_ptr, user_msg_ptr);
+        sscanf(user_input, "%s%d", command_input, id_ptr);
 
         // User enters OPTION:
         if (strncmp(command_input, "OPTIONS", strlen("OPTIONS")) == 0)
@@ -139,7 +144,7 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // User enters SUB <channel id>
-
+            printf("subccc");
             request_t request = createRequest(SUB, id_inputted, clientID, NULL);
 
             if (sendRequest(request, sockfd) == 1)
@@ -259,25 +264,33 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "SEND", strlen("SEND")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // User enters SEND<channelid><message>
+            // printf("\n%s  %d \n%s\n", command_input, id_inputted);
 
-            char *message_content;
-            strcpy(message_content, "THIS IS A MESSAGE");
-
-            printf("\n%s  %d \n%s\n", command_input, id_inputted, message_content);
+            // Ask for message input.
+            printf("Enter Your Message: ");
+            fgets(message, MAX_MESSAGE_LENGTH, stdin);
+            // printf("\nMessage by user:%s\n", message);
 
             // Create a message obect
-            // message_t message = parseMessage();
 
-            // request_t request = createRequest(SUB, id_inputted, clientID, message);
+            if (parseUserMessage(&client_message, message, clientID) == 1)
+            {
+                perror("CLIENT: Parse Error: Invalid or no message found.\n");
+                printf("CLIENT: no message found\n");
+            }
+            else
+            {
+                request_t request = createRequest(SEND, id_inputted, clientID, &client_message);
 
-            // if (sendRequest(request, sockfd) == 1)
-            // {
-            //     printf("Client: Error, send message request to server failed\n");
-            // }
-            // else
-            // {
-            //     printf("\nClient: Successfully sent message request to server...\n");
-            // }
+                if (sendRequest(request, sockfd) == 1)
+                {
+                    printf("Client: Error, send message request to server failed\n");
+                }
+                else
+                {
+                    printf("\nClient: Successfully sent message request to server...\n");
+                }
+            }
 
             printf("\nType Command: ");
         }
@@ -332,7 +345,7 @@ void display_menu()
 }
 
 // Creates a request object and checks if message included or not
-request_t createRequest(int command, int channel_id, int clientID, char *message)
+request_t createRequest(int command, int channel_id, int clientID, message_t *message)
 {
 
     request_t clientRequest;
@@ -340,21 +353,13 @@ request_t createRequest(int command, int channel_id, int clientID, char *message
     clientRequest.commandID = command;
     clientRequest.channelID = channel_id;
     clientRequest.clientID = clientID;
-
-    // If message inputted, assign to the request struct
-    if (&message[0] != NULL)
+    if (message != NULL)
     {
-        printf("REQ HAS MSG: %s\n", message);
-
-        strcpy(clientRequest.message, message);
-    }
-    else
-    {
-        printf("no message found\n");
+        clientRequest.client_message = *message;
     }
 
     printf("\n Client Request Object:\n command id %d\n channel id %d \n client id %d\n client message %s\n",
-           clientRequest.commandID, clientRequest.channelID, clientRequest.clientID, clientRequest.message);
+           clientRequest.commandID, clientRequest.channelID, clientRequest.clientID, clientRequest.client_message.content);
 
     return clientRequest;
 }
@@ -371,4 +376,23 @@ int sendRequest(request_t clientRequest, int sock_id)
     }
 
     return 0; // requests successful.
+}
+int parseUserMessage(message_t *client_message, char *message, int clientID)
+{
+    printf("parsing...\n");
+    // If message inputted, assign to the request struct
+    if (sizeof(*message) <= MAX_MESSAGE_LENGTH && &message[0] != NULL)
+    {
+        strncpy(client_message->content, message, MAX_MESSAGE_LENGTH);
+        client_message->ownerID = clientID;
+        client_message->next = NULL;
+
+        // printf("\nTESTING: content %s  id %d\n", client_message->content, client_message->ownerID);
+
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
