@@ -31,6 +31,12 @@
 #define SEND 4
 
 /*
+    GLOBAL 
+*/
+
+int msgSentCount = 0;
+
+/*
     STRUCTS
 */
 
@@ -40,6 +46,7 @@ typedef struct message message_t;
 
 struct message
 {
+    int messageID;
     int ownerID;
     char content[MAX_MESSAGE_LENGTH];
     message_t *next;
@@ -379,13 +386,21 @@ int sendRequest(request_t clientRequest, int sock_id)
 }
 int parseUserMessage(message_t *client_message, char *message, int clientID)
 {
+
     printf("parsing...\n");
     // If message inputted, assign to the request struct
     if (sizeof(*message) <= MAX_MESSAGE_LENGTH && &message[0] != NULL)
     {
+
+        // CRITICAL SECTION msgSendCount should only be incremented one by one by threads ?????********
         strncpy(client_message->content, message, MAX_MESSAGE_LENGTH);
         client_message->ownerID = clientID;
         client_message->next = NULL;
+
+        msgSentCount += 1;
+        client_message->messageID = msgSentCount;
+
+        // CRITICAL SECTION end ********
 
         // printf("\nTESTING: content %s  id %d\n", client_message->content, client_message->ownerID);
 

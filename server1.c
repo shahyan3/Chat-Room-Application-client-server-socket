@@ -45,10 +45,13 @@ typedef struct message message_t;
 
 struct message
 {
+    int messageID;
     int ownerID;
     char content[MAX_MESSAGE_LENGTH];
     message_t *next;
 };
+
+message_t client_message;
 
 typedef struct request request_t;
 
@@ -60,6 +63,8 @@ struct request
     message_t message;
 };
 
+request_t clientRequest;
+
 typedef struct client client_t;
 
 struct client
@@ -68,7 +73,7 @@ struct client
     int readMsg;
     int unReadMsg;
     int totalMessageSent;
-    int messageQueueIndex;  /* index = message that it read currently, NOT NEXT ONE */
+    // int messageQueueIndex;  /* index = message that it read currently, NOT NEXT ONE */
     int entryIndexConstant; /* index of msg queue at which the client subed */
     client_t *next;
 };
@@ -202,14 +207,6 @@ int main(int argc, char *argv[])
         }
         printf("This is server\n");
 
-        // /* create message */
-        // char *msg = "This is message 1\0"; // USE MALLOC SO ITS ON HEAP, FOR EACH THREAD ACCESS, AND ENSRUE 1024 SIZE ??
-        // message_t message1;
-        // message1.messageID = 1;
-        // message1.ownerID = 1;
-        // strcpy(message1.content, msg);
-        // message1.next = NULL;
-
         // Create a channel
         channel_t channel1;
 
@@ -218,6 +215,7 @@ int main(int argc, char *argv[])
         channel1.subscriberHead = NULL;
         channel1.subscriberTail = NULL;
         channel1.messageHead = NULL;
+        channel1.messageTail = NULL;
 
         hostedChannels[0] = channel1;
         // printf("Hosted Channel %d\n", hostedChannels[0].channelID);
@@ -231,15 +229,13 @@ int main(int argc, char *argv[])
             printf("Error: Welcome message not sent to client \n");
         }
 
-        request_t clientRequest;
-
         while (recv(new_fd, &clientRequest, sizeof(request_t), 0))
         {
 
             if (handleClientRequests(&clientRequest, &client) == 0)
             {
-                // printf("\n SERVER: Request Object:\n command id %d\n channel id %d \n client id %d\n client message %s\n",
-                //        clientRequest.commandID, clientRequest.channelID, clientRequest.clientID, clientRequest.message.content);
+                // printf("\n SERVER: Request Object: \n command id %d\n channel id %d \n client id %d\n client message %s\n msg ID %d\n",
+                //        clientRequest.commandID, clientRequest.channelID, clientRequest.clientID, clientRequest.message.content, clientRequest.message.messageID);
 
                 printf("SERVER: successfully receive client request [userInput]!\n");
             }
@@ -293,6 +289,7 @@ int handleClientRequests(request_t *request, client_t *client)
         // printf("$Command id %d and channel id %d\n", request->commandID, request->channelID);
         writeToChannelReq(request);
         print_channel_messages(request->channelID);
+        print_subscribers();
 
         return 0;
     }
@@ -335,7 +332,6 @@ int create_client(client_t *client)
     client->unReadMsg = 0;
     client->totalMessageSent = 0;
     client->entryIndexConstant = 0;
-    client->messageQueueIndex = 0;
     client->next = NULL;
 
     if (&client->clientID != NULL)
@@ -357,11 +353,18 @@ void print_subscribers()
 
     while (subHead != NULL)
     {
-        printf("Subscriber id %d\n entryIndexQueue %d\n", subHead->clientID, subHead->entryIndexConstant);
+        printf("Subscriber id %d \n", subHead->clientID);
+        printf("Subscriber entryIndexConstant %d \n", subHead->entryIndexConstant);
+        printf("Subscriber readMsg %d \n", subHead->readMsg);
+        printf("Subscriber unReadMsg %d \n", subHead->unReadMsg);
+        printf("Subscriber totalMessageSent %d \n", subHead->totalMessageSent);
+        printf("\n\n -------------------------- \n\n");
+
         subHead = subHead->next;
     }
 
     printf("TAIL: subscriber id %d\n\n", channel->subscriberTail->clientID);
+    printf("HEAD: subscriber id %d\n\n", channel->subscriberHead->clientID);
     printf("====================== \n");
 }
 
@@ -471,15 +474,17 @@ void subscribe(client_t *client, int channel_id)
 void writeToChannelReq(request_t *request)
 { // critical section ?
 
-    message_t *tailMsg;
     client_t *client;
     channel_t *channel;
 
-    message_t currentNode;
+    message_t *client_message = malloc(sizeof(message_t));
+    *client_message = request->message;
+    client_message->next = NULL;
+
+    message_t *currentNode;
 
     int i = 0;
 
-    // hostedChannels.forEach(channel = > {
     for (i = 0; i < MAX_CHANNELS; i++)
     {
         if (hostedChannels[i].channelID == request->channelID)
@@ -488,38 +493,37 @@ void writeToChannelReq(request_t *request)
 
             // channel exists
             client = findSubsriberInList(channel, request->clientID);
+
             if (client->clientID == request->clientID)
             { // client is subscribed to channel
-                printf("here 1\n");
-
-                // tailMsg = channel->messageHead;
-                // channel->messageHead = &request->message;
-                // channel->messageHead->next = tailMsg;
 
                 if (channel->messageHead == NULL)
                 {
-                    channel->messageHead = &request->message;
+                    channel->messageHead = client_message;
 
-                    printf("head msg %s \n", channel->messageHead->content);
+                    channel->messageTail = channel->messageHead; /* point the tail to the head */
+
+                    // printf("(NULL)head msg %s \n", channel->messageHead->content);
+                    // printf("(NULL)tail msg %s \n", channel->messageTail->content);
                 }
                 else
                 {
-                    currentNode = *channel->messageHead;
-                    // printf("currentNode %s\n", currentNode.content);
 
-                    while (currentNode.next != NULL)
+                    currentNode = channel->messageHead;
+
+                    while (currentNode->next != NULL)
                     {
-                        currentNode = *currentNode.next;
+                        currentNode = currentNode->next;
                     }
-                    currentNode.next = &request->message;
+                    // Add new message to head of the list
+                    currentNode->next = malloc(sizeof(message_t));
+                    *currentNode->next = *client_message;
 
-                    // ADD THE MESSAGE HEAD
-                    channel->messageHead = &currentNode;
-                    // ADD MESSAGE TAIL AS NEXT
-                    channel->messageTail = currentNode.next;
+                    channel->messageTail = currentNode->next;
 
-                    // printf("head msg %s \n", channel->messageHead->content);
-                    // printf("tail msg %s \n", channel->messageTail->content);
+                    // printf("(ESLE) head msg %s \n", channel->messageHead->content);
+                    // printf("head msg next %s \n", channel->messageHead->next->content);
+                    // printf("(ELSE) tail msg %s \n", channel->messageTail->content);
                 }
 
                 // works: update unreadMsg property for all subcribed clients except client with this clientID
@@ -548,16 +552,16 @@ void print_channel_messages(int channel_id)
             message_t *msgHead = channel->messageHead;
 
             printf("\n==== Channel's Messages ====\n");
-            while (msgHead = NULL)
+            if (msgHead == NULL)
             {
-                printf("Message:Owner Id: %d\n Content %s\n", msgHead->ownerID, msgHead->content);
+                printf("No Messages FOUND!");
+            }
+            while (msgHead != NULL)
+            {
+                printf("Message ID %d Message:Owner Id: %d. Content %s \n", msgHead->messageID, msgHead->ownerID, msgHead->content);
                 msgHead = msgHead->next;
             }
-
-            // printf("msg id 1 %s \n", msgHead->content);
-            // printf("msg id 2%s \n", msgHead->next->content);
-            // printf("msg id 3 %s \n", msgHead->next->next->content);
         }
     }
-    printf("==== Channel's Messages ====\n\n");
+    printf("\n\n==== Channel's Messages ====\n\n");
 }
