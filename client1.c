@@ -243,7 +243,19 @@ int main(int argc, char *argv[])
         else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 &&
                  id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
         { // // User enters NEXT <channel id>
-            printf("\n WITH ID %s  %d\n", command_input, id_inputted);
+            // printf("\n WITH ID %s  %d\n", command_input, id_inputted);
+
+            request_t request = createRequest(NEXT, id_inputted, clientID, NULL);
+
+            if (sendRequest(request, sockfd) == 1)
+            {
+                printf("Client: Error, NEXT message request to server failed\n");
+            }
+            else
+            {
+                printf("\nClient: Successfully sent NEXT message request to server...\n");
+            }
+
             id_inputted = RESET_TO_ZERO;
 
             printf("\nType Command: ");

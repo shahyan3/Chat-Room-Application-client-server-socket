@@ -109,6 +109,10 @@ void updateUnreadMsgCountForSubscribers(channel_t *channel);
 void writeToChannelReq(request_t *request);
 
 void print_channel_messages(int channel_id);
+
+message_t *searchNextMsgInList(channel_t *channel, client_t *client);
+
+message_t readNextMsgFromChannel(int clientID, int channelID);
 /*
     END OF
 */
@@ -290,6 +294,34 @@ int handleClientRequests(request_t *request, client_t *client)
         writeToChannelReq(request);
         print_channel_messages(request->channelID);
         print_subscribers();
+
+        printf("Channel total messages: %d\n", hostedChannels[0].totalMsg);
+
+        return 0;
+    }
+
+    if (request->commandID == NEXT && request->channelID)
+    { // READ message to channel
+        printf("\nServer: next request recevied.\n");
+
+        if (client->unReadMsg > 0)
+        {
+            message_t unreadMessage = readNextMsgFromChannel(client->clientID, request->channelID);
+
+            printf("\n## NEXT MSG RETURNED \n");
+            printf("NEXT message id: %d \n", unreadMessage.messageID);
+            printf("NEXT message content: %s \n", unreadMessage.content);
+            // printf("NEXT message ownderID: %d ", unreadMessage.ownerID);
+
+            print_subscribers();
+
+            printf("\nChannel total messages: %d\n", hostedChannels[0].totalMsg);
+        }
+        else
+        {
+            printf("\nNo new messages in channel found...\n\n");
+            //  send();  send server_t request object with message. No messages to read.
+        }
 
         return 0;
     }
@@ -503,6 +535,9 @@ void writeToChannelReq(request_t *request)
 
                     channel->messageTail = channel->messageHead; /* point the tail to the head */
 
+                    // update total message in channel
+                    channel->totalMsg += 1;
+
                     // printf("(NULL)head msg %s \n", channel->messageHead->content);
                     // printf("(NULL)tail msg %s \n", channel->messageTail->content);
                 }
@@ -521,6 +556,9 @@ void writeToChannelReq(request_t *request)
 
                     channel->messageTail = currentNode->next;
 
+                    // update total msg count for channel.totalMessages
+                    channel->totalMsg += 1;
+
                     // printf("(ESLE) head msg %s \n", channel->messageHead->content);
                     // printf("head msg next %s \n", channel->messageHead->next->content);
                     // printf("(ELSE) tail msg %s \n", channel->messageTail->content);
@@ -529,8 +567,6 @@ void writeToChannelReq(request_t *request)
                 // works: update unreadMsg property for all subcribed clients except client with this clientID
                 updateUnreadMsgCountForSubscribers(channel);
 
-                // update total msg count for channel.totalMessages
-                channel->totalMsg += 1;
                 // end of critical section ?
             }
             else
@@ -564,4 +600,81 @@ void print_channel_messages(int channel_id)
         }
     }
     printf("\n\n==== Channel's Messages ====\n\n");
+}
+
+message_t *searchNextMsgInList(channel_t *channel, client_t *client)
+{
+    message_t *unreadMessage;
+    message_t *currentNode = channel->messageHead;
+
+    if (client->entryIndexConstant < channel->totalMsg)
+    { // client message queue count less than total messages ????????????????
+        // update message queue index
+        client->entryIndexConstant += 1;
+    }
+
+    if (currentNode == NULL)
+    {
+        // no messages in channel
+        printf("no messages in channel!\n");
+    }
+
+    while (currentNode != NULL)
+    { // While (all) messages in channel
+        if (currentNode->messageID == client->entryIndexConstant)
+        {
+            // if messageID is the next in messageQueueIndex for client
+            unreadMessage = currentNode;
+            // client->messageQueueIndex += 1; // update messageQueueIndex
+
+            client->readMsg += 1;   // update read messages count
+            client->unReadMsg -= 1; // update unread messages count
+        }
+        currentNode = currentNode->next;
+    }
+    return unreadMessage;
+}
+
+message_t readNextMsgFromChannel(int clientID, int channelID)
+{
+    message_t unreadMessage;
+    int i = 0;
+
+    for (i = 0; i < MAX_CHANNELS; i++)
+    {
+        if (hostedChannels[i].channelID == channelID)
+        {
+            // channel exists
+            channel_t *channel = &hostedChannels[i];
+            client_t *client = findSubsriberInList(channel, clientID);
+
+            //  find the NEXT unread message in the channel messag linked list
+
+            // if (client->unReadMsg > 0)
+            // {
+            printf("greater than 0\n");
+            message_t *nextMessage = searchNextMsgInList(channel, client);
+
+            if (nextMessage == NULL)
+            {
+                printf("no message found\n");
+            }
+            else
+            {
+                unreadMessage = *nextMessage;
+                // printf("\n## NEXT MSG RETURNED \n");
+                // printf("NEXT message id: %d \n", unreadMessage.messageID);
+                // printf("NEXT message content: %s \n", unreadMessage.content);
+                // printf("NEXT message ownderID: %d \n", unreadMessage.ownerID);
+
+                // send() REQUEST to client here
+            }
+        }
+        else
+        {
+            printf("no messages found in channel!");
+        }
+    }
+
+    return unreadMessage;
 }
