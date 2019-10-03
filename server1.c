@@ -73,7 +73,7 @@ struct client
     int readMsg;
     int unReadMsg;
     int totalMessageSent;
-    // int messageQueueIndex;  /* index = message that it read currently, NOT NEXT ONE */
+    int messageQueueIndex;  /* index = message that it read currently, NOT NEXT ONE */
     int entryIndexConstant; /* index of msg queue at which the client subed */
     client_t *next;
 };
@@ -268,22 +268,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
         subscribe(client, request->channelID);
 
-        /* Fake test linked list */
-        // client_t client2;
-        // create_client(&client2);
-        // subscribe(&client2, request->channelID);
-
-        // client_t client3;
-        // create_client(&client3);
-        // subscribe(&client3, request->channelID);
-
-        // client_t client4;
-        // create_client(&client4);
-        // subscribe(&client4, request->channelID);
-
         print_subscribers();
-
-        /* END */
 
         return 0;
     }
@@ -363,6 +348,7 @@ int create_client(client_t *client)
     client->readMsg = 0;
     client->unReadMsg = 0;
     client->totalMessageSent = 0;
+    client->messageQueueIndex = 0;
     client->entryIndexConstant = 0;
     client->next = NULL;
 
@@ -386,6 +372,7 @@ void print_subscribers()
     while (subHead != NULL)
     {
         printf("Subscriber id %d \n", subHead->clientID);
+        printf("Subscriber messageQueueIndex %d \n", subHead->messageQueueIndex);
         printf("Subscriber entryIndexConstant %d \n", subHead->entryIndexConstant);
         printf("Subscriber readMsg %d \n", subHead->readMsg);
         printf("Subscriber unReadMsg %d \n", subHead->unReadMsg);
@@ -476,6 +463,10 @@ void subscribe(client_t *client, int channel_id)
             {
                 // printf("Selected channels subscriberHead is NULL\n");
 
+                // update the client message queue to current message count in channel
+                client->entryIndexConstant = channel->totalMsg;
+                client->messageQueueIndex = channel->totalMsg;
+
                 // push to linked list
                 channel->subscriberHead = client;
                 channel->subscriberTail = channel->subscriberHead; // track the last node
@@ -484,6 +475,10 @@ void subscribe(client_t *client, int channel_id)
             else
             {
                 // printf("Selected channels subscriberHead is NOT NULL\n");
+
+                // update the client message queue to current message count in channel
+                client->entryIndexConstant = channel->totalMsg;
+                client->messageQueueIndex = channel->totalMsg;
 
                 while (currentNode->next != NULL)
                 {
@@ -604,35 +599,69 @@ void print_channel_messages(int channel_id)
 
 message_t *searchNextMsgInList(channel_t *channel, client_t *client)
 {
+
     message_t *unreadMessage;
     message_t *currentNode = channel->messageHead;
-
-    if (client->entryIndexConstant < channel->totalMsg)
-    { // client message queue count less than total messages ????????????????
-        // update message queue index
-        client->entryIndexConstant += 1;
-    }
+    int clientsNextMessageToReadIndex = client->messageQueueIndex + 1;
 
     if (currentNode == NULL)
     {
         // no messages in channel
-        printf("no messages in channel!\n");
+        // unreadMessage = NULL;
+        printf("\nno messages in channel!\n");
     }
+    else
+    {
 
-    while (currentNode != NULL)
-    { // While (all) messages in channel
-        if (currentNode->messageID == client->entryIndexConstant)
+        while (currentNode != NULL)
         {
-            // if messageID is the next in messageQueueIndex for client
-            unreadMessage = currentNode;
-            // client->messageQueueIndex += 1; // update messageQueueIndex
+            if (currentNode->messageID == clientsNextMessageToReadIndex)
+            {
+                // if messageID is the next in messageQueueIndex for client
+                unreadMessage = currentNode;
+                client->messageQueueIndex += 1; // update messageQueueIndex
 
-            client->readMsg += 1;   // update read messages count
-            client->unReadMsg -= 1; // update unread messages count
+                client->readMsg += 1;   // update read messages count
+                client->unReadMsg -= 1; // update unread messages count
+            }
+            currentNode = currentNode->next;
         }
-        currentNode = currentNode->next;
+        return unreadMessage;
     }
-    return unreadMessage;
+
+    // message_t *unreadMessage;
+    // message_t *currentNode = channel->messageHead;
+
+    // if (client->messageQueueIndex < channel->totalMsg && client->messageQueueIndex >= client->entryIndexConstant)
+    // { // client message queue count less than total messages ????????????????
+    //     // update message queue index
+    //     client->messageQueueIndex += 1;
+    // }
+    // else
+    // {
+    //     printf("no new messages!");
+    // }
+
+    // if (currentNode == NULL)
+    // {
+    //     // no messages in channel
+    //     printf("no messages in channel!\n");
+    // }
+
+    // while (currentNode != NULL)
+    // { // While (all) messages in channel
+    //     if (currentNode->messageID == client->entryIndexConstant)
+    //     {
+    //         // if messageID is the next in messageQueueIndex for client
+    //         unreadMessage = currentNode;
+    //         // client->messageQueueIndex += 1; // update messageQueueIndex
+
+    //         client->readMsg += 1;   // update read messages count
+    //         client->unReadMsg -= 1; // update unread messages count
+    //     }
+    //     currentNode = currentNode->next;
+    // }
+    // return unreadMessage;
 }
 
 message_t readNextMsgFromChannel(int clientID, int channelID)
