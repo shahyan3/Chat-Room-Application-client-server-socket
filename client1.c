@@ -263,7 +263,21 @@ int main(int argc, char *argv[])
             {
                 printf("\nClient: Successfully sent NEXT without id request to server...\n");
 
-                // recv(sockfd, &serverResponse, sizeof(response_t), 0);
+                // if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+                // {
+                //     perror("Error! Failed to receive response from server!\n");
+                //     printf("\n CLIENT: No messages Found from command: NEXT [no id]\n");
+                // }
+
+                // if (recv(sockfd, &serverResponse, sizeof(response_t), 0) != -1)
+                // {
+                //     printf("\n\n =======*****========= \n");
+                //     printf("SERVER RESPONSE (NEXT no id)\n");
+                //     // printf("\nServer response client id: %d\n", serverResponse.clientID);
+                //     // printf("\nServer response message : %s\n", serverResponse.message.content);
+                //     // printf("\nServer response error status : %d\n", serverResponse.error);
+                //     printf("\n == =======***** ======== \n");
+                // }
             }
 
             id_inputted = RESET_TO_ZERO;
