@@ -368,18 +368,21 @@ int handleClientRequests(request_t *request, client_t *client)
                     response_t response = createServerErrorResponse(&errorMessage);
                     sendResponse(response, new_fd);
                 }
-                else
-                {
-                    printf("\nSERVER: Failed to send error message to client \n");
-                }
             }
         }
         else
         {
-            printf("\n ^Channel id given not found! \n");
-            // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+            char *message = "Channel id given not found!";
+            printf("\n %s\n", message);
 
-            // return 1;
+            // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+            message_t errorMessage = createStatusResponseMessage(message, request->clientID);
+
+            if (&errorMessage != NULL)
+            {
+                response_t response = createServerErrorResponse(&errorMessage);
+                sendResponse(response, new_fd);
+            }
         }
 
         print_channels();
