@@ -376,6 +376,14 @@ int main(int argc, char *argv[])
                 else
                 {
                     printf("\nClient: Successfully sent message request to server...\n");
+
+                    if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
+                    {
+                        printf("\n ===============================================\n");
+                        printf("|            SERVER RESPONSE                      \n");
+                        printf("| %s ", serverResponse.message.content);
+                        printf("\n ===============================================\n");
+                    }
                 }
             }
 
