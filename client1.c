@@ -14,7 +14,7 @@
 #define RETURNED_ERROR -1
 #define SERVER_ON_CONNECT_MSG_SIZE 40
 #define MIN_CHANNELS 1
-#define MAX_CHANNELS 5
+#define MAX_CHANNELS 3
 #define RESET_TO_ZERO 0
 
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
@@ -308,18 +308,25 @@ int main(int argc, char *argv[])
                 {
                     if (serverResponse.error == 0)
                     {
-                        printf("\n\n =================== \n");
-                        printf("SERVER RESPONSE \n");
-                        printf("\nServer response client id: %d\n", serverResponse.clientID);
-                        printf("\nServer response message : %s\n", serverResponse.message.content);
-                        printf("\nServer response error status : %d\n", serverResponse.error);
-                        printf("\n == ================= \n");
+                        // printf("\n\n =================== \n");
+                        // printf("MessageRESPONSE \n");
+                        // printf("\nServer response client id: %d\n", serverResponse.clientID);
+                        // printf("\nServer response message : %s\n", serverResponse.message.content);
+                        // printf("\nServer response error status : %d\n", serverResponse.error);
+                        // printf("\n == ================= \n");
+
+                        printf("\n===============================================\n");
+                        printf("            SERVER RESPONSE (Success!)         \n");
+                        printf(" \t\tClient ID %d: %s\n", serverResponse.clientID, serverResponse.message.content);
+                        printf("\n===============================================\n");
                     }
                     else
                     {
-                        printf("\n ===================================\n");
-                        printf("\n| No new messages found in channel! |\n");
-                        printf("\n ===================================\n");
+
+                        printf("\n ===============================================\n");
+                        printf("|            SERVER RESPONSE (Error)              \n");
+                        printf("| %s ", serverResponse.message.content);
+                        printf("\n ===============================================\n");
                     }
                 }
             }
