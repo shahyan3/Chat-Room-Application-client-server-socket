@@ -308,13 +308,6 @@ int main(int argc, char *argv[])
                 {
                     if (serverResponse.error == 0)
                     {
-                        // printf("\n\n =================== \n");
-                        // printf("MessageRESPONSE \n");
-                        // printf("\nServer response client id: %d\n", serverResponse.clientID);
-                        // printf("\nServer response message : %s\n", serverResponse.message.content);
-                        // printf("\nServer response error status : %d\n", serverResponse.error);
-                        // printf("\n == ================= \n");
-
                         printf("\n===============================================\n");
                         printf("            SERVER RESPONSE (Success!)         \n");
                         printf(" \t\tClient ID %d: %s\n", serverResponse.clientID, serverResponse.message.content);
@@ -322,7 +315,6 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-
                         printf("\n ===============================================\n");
                         printf("|            SERVER RESPONSE (Error)              \n");
                         printf("| %s ", serverResponse.message.content);

@@ -130,7 +130,7 @@ void print_channel_messages(int channel_id);
 
 void print_channels();
 
-message_t *searchNextMsgInList(channel_t *channel, client_t *client);
+message_t searchNextMsgInList(channel_t *channel, client_t *client);
 
 message_t readNextMsgFromChannel(channel_t *channel, client_t *client);
 
@@ -870,10 +870,10 @@ void print_channels()
     }
 }
 
-message_t *searchNextMsgInList(channel_t *channel, client_t *client)
+message_t searchNextMsgInList(channel_t *channel, client_t *client)
 {
 
-    message_t *unreadMessage;
+    message_t unreadMessage;
     message_t *currentNode = channel->messageHead;
     int clientsNextMessageToReadIndex = client->messageQueueIndex + 1;
 
@@ -892,7 +892,7 @@ message_t *searchNextMsgInList(channel_t *channel, client_t *client)
             if (currentNode->messageID == clientsNextMessageToReadIndex)
             {
                 // if messageID is the next in messageQueueIndex for client
-                unreadMessage = currentNode;
+                unreadMessage = *currentNode;
                 client->messageQueueIndex += 1; // update messageQueueIndex
 
                 client->readMsg += 1;   // update read messages count
@@ -901,7 +901,7 @@ message_t *searchNextMsgInList(channel_t *channel, client_t *client)
             currentNode = currentNode->next;
         }
 
-        printf("\n 3. msg: %s\n", unreadMessage->content);
+        printf("\n 3. msg: %s\n", unreadMessage.content);
         return unreadMessage;
     }
 }
@@ -909,11 +909,11 @@ message_t *searchNextMsgInList(channel_t *channel, client_t *client)
 message_t readNextMsgFromChannel(channel_t *channel, client_t *client)
 { // &&&&&&&&&&&&&&& FIX LIKE BLOODY SEND ONE - REMOVE FOR LOOP WITH FUCNTION
 
-    message_t *unreadMessage = searchNextMsgInList(channel, client);
+    message_t unreadMessage = searchNextMsgInList(channel, client);
 
-    printf("\n 2.Next msg: %s\n", unreadMessage->content);
+    printf("\n 2.Next msg: %s\n", unreadMessage.content);
 
-    return *unreadMessage;
+    return unreadMessage;
 }
 
 // NEXT: returns unread message from all channels one by one
