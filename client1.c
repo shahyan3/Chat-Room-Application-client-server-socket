@@ -486,9 +486,6 @@ int parseUserMessage(message_t *client_message, char *message, int clientID)
         client_message->ownerID = clientID;
         client_message->next = NULL;
 
-        // msgSentCount += 1;
-        // client_message->messageID = msgSentCount;
-
         // CRITICAL SECTION end ********
 
         // printf("\nTESTING: content %s  id %d\n", client_message->content, client_message->ownerID);

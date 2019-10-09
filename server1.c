@@ -399,13 +399,10 @@ int handleClientRequests(request_t *request, client_t *client)
         channel_t *channel;
 
         channel = getChannel(request->channelID); // find the channel given channel id
-        printf("\n CHANNEL ID READING: %d\n", channel->channelID);
 
         if (channel != NULL)
         {
             client_t *client = findSubscriberInChannel(channel, request->clientID);
-
-            printf("\n SELECT CLIENT unreads: %d\n", client->unReadMsg);
 
             if (client != NULL)
             {
@@ -706,12 +703,11 @@ client_t *findSubscriberInChannel(channel_t *channel, int clientID)
 
     if (subHead == NULL)
     {
-        // printf("\n *no subscriber in the list\n");
+        // printf("\n **no subscriber in the list\n");
         return subHead;
     }
     else
     {
-
         while (subHead != NULL)
         {
             if (subHead->clientID == clientID)
