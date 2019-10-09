@@ -116,9 +116,9 @@ response_t createServerErrorResponse(message_t *message);
 
 message_t *findLastMsgInLinkedList(channel_t channel);
 
-void subscribe(client_t *client, int channel_id);
+void subscribe(client_t *client_, int channel_id);
 
-client_t *findSubsriberInList(channel_t *channel, int clientID);
+client_t *findSubscriberInChannel(channel_t *channel, int clientID);
 
 void print_subscribers();
 
@@ -338,7 +338,7 @@ int handleClientRequests(request_t *request, client_t *client)
         {
             // printf("SEND: channel id is... found %d \n", channel->channelID);
 
-            client = findSubsriberInList(channel, request->clientID);
+            client = findSubscriberInChannel(channel, request->clientID);
 
             if (client != NULL && client->clientID == request->clientID)
             { // client is subscribed to channel
@@ -398,11 +398,14 @@ int handleClientRequests(request_t *request, client_t *client)
 
         channel_t *channel;
 
-        channel = getChannel(request->channelID);
+        channel = getChannel(request->channelID); // find the channel given channel id
+        printf("\n CHANNEL ID READING: %d\n", channel->channelID);
 
         if (channel != NULL)
         {
-            client_t *client = findSubsriberInList(channel, request->clientID);
+            client_t *client = findSubscriberInChannel(channel, request->clientID);
+
+            printf("\n SELECT CLIENT unreads: %d\n", client->unReadMsg);
 
             if (client != NULL)
             {
@@ -609,7 +612,7 @@ response_t createServerResponse(message_t *message, client_t *client)
         response->error = 1;
     }
 
-    printf("\n$MAS: %s\n", response->message.content);
+    // printf("\n$MAS: %s\n", response->message.content);
 
     return *response;
 }
@@ -646,23 +649,32 @@ int create_client(client_t *client)
 }
 void print_subscribers()
 {
-    channel_t *channel = &hostedChannels[0];
-
-    client_t *subHead = channel->subscriberHead;
+    int i = 0;
+    channel_t *channel;
 
     printf("==== Subscribers =====\n");
 
-    while (subHead != NULL)
+    for (i = 0; i < MAX_CHANNELS; i++)
     {
-        printf("Subscriber id %d \n", subHead->clientID);
-        printf("Subscriber messageQueueIndex %d \n", subHead->messageQueueIndex);
-        printf("Subscriber entryIndexConstant %d \n", subHead->entryIndexConstant);
-        printf("Subscriber readMsg %d \n", subHead->readMsg);
-        printf("Subscriber unReadMsg %d \n", subHead->unReadMsg);
-        printf("Subscriber totalMessageSent %d \n", subHead->totalMessageSent);
-        printf("\n\n -------------------------- \n\n");
+        channel_t *channel = &hostedChannels[i];
 
-        subHead = subHead->next;
+        if (channel->subscriberHead != NULL)
+        {
+            client_t *subHead = channel->subscriberHead;
+            printf("\n CHANNEL: %d \n", channel->channelID);
+            while (subHead != NULL)
+            {
+                printf("\t Subscriber id %d \n", subHead->clientID);
+                printf("\t Subscriber messageQueueIndex %d \n", subHead->messageQueueIndex);
+                printf("\t Subscriber entryIndexConstant %d \n", subHead->entryIndexConstant);
+                printf("\t Subscriber readMsg %d \n", subHead->readMsg);
+                printf("\t Subscriber unReadMsg %d \n", subHead->unReadMsg);
+                printf("\t Subscriber totalMessageSent %d \n", subHead->totalMessageSent);
+                printf("\n -------------------------- \n");
+
+                subHead = subHead->next;
+            }
+        }
     }
 
     // printf("TAIL: subscriber id %d\n\n", channel->subscriberTail->clientID);
@@ -684,11 +696,12 @@ void updateUnreadMsgCountForSubscribers(channel_t *channel)
     }
 }
 
-client_t *findSubsriberInList(channel_t *channel, int clientID)
+client_t *findSubscriberInChannel(channel_t *channel, int clientID)
 {
     // printf("\n\n *** clientid %d, CHANNEL ID %d\n", clientID, channel->channelID);
 
     client_t *client = NULL;
+
     client_t *subHead = channel->subscriberHead;
 
     if (subHead == NULL)
@@ -733,8 +746,11 @@ message_t *findLastMsgInLinkedList(channel_t channel)
     return lastMsgInList;
 }
 
-void subscribe(client_t *client, int channel_id)
+void subscribe(client_t *client_, int channel_id)
 {
+    client_t *client = malloc(sizeof(client_t));
+    *client = *client_;
+
     int i = 0;
     channel_t *channel;
     client_t *currentNode;
@@ -794,18 +810,23 @@ void writeToChannelReq(request_t *request, channel_t *channel)
 
     message_t *client_message = malloc(sizeof(message_t));
     *client_message = request->message;
+
     client_message->next = NULL;
 
     message_t *currentNode;
 
     if (channel->messageHead == NULL)
     {
+        // 1. update total message in channel (before adding message to ensure correct message id given)
+        channel->totalMsg += 1;
+
+        // 2. Update Message ID: message id is equal to current total message count in channel
+        client_message->messageID = channel->totalMsg;
+
+        // 3. Add message to channel
         channel->messageHead = client_message;
 
         channel->messageTail = channel->messageHead; /* point the tail to the head */
-
-        // update total message in channel
-        channel->totalMsg += 1;
     }
     else
     {
@@ -816,14 +837,19 @@ void writeToChannelReq(request_t *request, channel_t *channel)
         {
             currentNode = currentNode->next;
         }
-        // Add new message to head of the list
+        // 1. create memory for last node.next pointer
         currentNode->next = malloc(sizeof(message_t));
+
+        // 2. update total msg count for channel.totalMessages
+        channel->totalMsg += 1;
+
+        // 3. Update Message ID: message id is equal to current total message count in channel
+        client_message->messageID = channel->totalMsg;
+
+        // 4. Add message to the end of the messageHead list
         *currentNode->next = *client_message;
 
         channel->messageTail = currentNode->next;
-
-        // update total msg count for channel.totalMessages
-        channel->totalMsg += 1;
     }
 
     // works: update unreadMsg property for all subcribed clients except client with this clientID
@@ -877,20 +903,27 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
     message_t *currentNode = channel->messageHead;
     int clientsNextMessageToReadIndex = client->messageQueueIndex + 1;
 
+    printf("\nSELECTED CHANNEL unReads ### %d\n", client->unReadMsg);
+
     if (currentNode == NULL)
     {
         // no messages in channel
         // unreadMessage = NULL;
-        printf("\nno messages in channel!\n");
+        printf("\n-->no messages in channel!\n");
         return unreadMessage;
     }
     else
     {
 
+        printf("\n-->YES 111111111111\n");
+
         while (currentNode != NULL)
         {
+
             if (currentNode->messageID == clientsNextMessageToReadIndex)
             {
+                printf("\n-->YES 22222\n"); // MESSAGE ID is starting at 3 for channel 2, therefore doesn't read. #bug
+
                 // if messageID is the next in messageQueueIndex for client
                 unreadMessage = *currentNode;
                 client->messageQueueIndex += 1; // update messageQueueIndex
@@ -901,7 +934,7 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
             currentNode = currentNode->next;
         }
 
-        printf("\n 3. msg: %s\n", unreadMessage.content);
+        printf("\n CLIENT UPDATED unreads??? %d\n", client->unReadMsg);
         return unreadMessage;
     }
 }
@@ -909,9 +942,10 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
 message_t readNextMsgFromChannel(channel_t *channel, client_t *client)
 { // &&&&&&&&&&&&&&& FIX LIKE BLOODY SEND ONE - REMOVE FOR LOOP WITH FUCNTION
 
+    printf("SELECTED CHANNEL unReads $$ %d", client->unReadMsg);
     message_t unreadMessage = searchNextMsgInList(channel, client);
 
-    printf("\n 2.Next msg: %s\n", unreadMessage.content);
+    // printf("\n 2.Next msg: %s\n", unreadMessage.content);
 
     return unreadMessage;
 }
@@ -927,7 +961,7 @@ message_t readNextMsgFromAllChannel(int clientID)
     // for (i = 0; i < MAX_CHANNELS; i++)
     // {
     //     channel = &hostedChannels[1];
-    //     foundClient = findSubsriberInList(channel, clientID);
+    //     foundClient = findSubscriberInChannel(channel, clientID);
 
     //     if (foundClient != NULL && foundClient->clientID == clientID)
     //     { // Found channel client is subscribed too!
@@ -953,7 +987,7 @@ int nextMessageCountInChannels(int clientID)
     //     channel = &hostedChannels[i];
     //     if (channel != NULL)
     //     {
-    //         foundClient = findSubsriberInList(channel, clientID);
+    //         foundClient = findSubscriberInChannel(channel, clientID);
 
     //         // test below
     //         if (foundClient != NULL)
