@@ -14,7 +14,7 @@
 #define RETURNED_ERROR -1
 #define SERVER_ON_CONNECT_MSG_SIZE 40
 #define MIN_CHANNELS 1
-#define MAX_CHANNELS 255
+#define MAX_CHANNELS 3
 #define RESET_TO_ZERO 0
 
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
@@ -171,11 +171,11 @@ int main(int argc, char *argv[])
 
             if (sendRequest(request, sockfd) == 1)
             {
-                printf("Client: Error, NEXT message request to server failed\n");
+                printf("Client: Error, sub request to server failed\n");
             }
             else
             {
-                printf("\nClient: Successfully sent NEXT message request to server...\n");
+                // printf("\nClient: Successfully sub request to server...\n");
 
                 if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
                 {
@@ -205,35 +205,67 @@ int main(int argc, char *argv[])
 
             printf("\nType Command: ");
         }
-        // else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
+        else if ((strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0))
+        {
+            printf("UNSUB %d", id_inputted);
+
+            request_t request = createRequest(UNSUB, id_inputted, clientID, NULL);
+
+            if (sendRequest(request, sockfd) == 1)
+            {
+                printf("Client: Error, UNSUB request to server failed\n");
+            }
+            else
+            {
+                // printf("\nClient: Successfully sent UNSUB request to server...\n");
+
+                if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+                {
+                    perror("Error! Failed to receive response from server!\n");
+                    printf("\n Error! Failed to receive response from server!\n");
+                }
+                else
+                {
+                    if (serverResponse.error == 0)
+                    {
+                        printf("\n===============================================\n");
+                        printf("            SERVER RESPONSE (Success!)         \n");
+                        printf(" \t\t%s\n", serverResponse.message.content);
+                        printf("\n===============================================\n");
+                    }
+                    else
+                    {
+                        printf("\n ===============================================\n");
+                        printf("|            SERVER RESPONSE (Error)              \n");
+                        printf("|%s", serverResponse.message.content);
+                        printf("\n ===============================================\n");
+                    }
+                }
+            }
+
+            id_inputted = RESET_TO_ZERO;
+
+            printf("\nType Command: ");
+        }
+
+        // else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
         //          id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        // { // User enters SUB <channel id>
-        //     // printf("subccc");
-        //     request_t request = createRequest(SUB, id_inputted, clientID, NULL);
-
-        //     if (sendRequest(request, sockfd) == 1)
-        //     {
-        //         printf("Client: Error, subscribe request to server failed\n");
-        //     }
-        //     else
-        //     {
-        //         printf("\nClient: Successfully send subscribe request to server...\n");
-        //     }
-
+        // { // // User enters UNSUB <channel id>
+        //     printf("\n%s  %d\n", command_input, id_inputted);
         //     id_inputted = RESET_TO_ZERO;
 
         //     printf("\nType Command: ");
         // }
-        // else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
+        // else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
         //              id_inputted < MIN_CHANNELS ||
         //          id_inputted > MAX_CHANNELS)
         // {
-        //     printf("\n Invalid channel: %d.... \n", id_inputted);
+        //     printf("\n ERR! Channel Id %d not found... \n", id_inputted);
         //     id_inputted = RESET_TO_ZERO;
 
         //     printf("\nType Command: ");
         // }
-        // else if (strncmp(command_input, "SUB", strlen("SUB")) == 0 &&
+        // else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
         //          id_inputted == 0)
         // {
         //     printf("\n ERR! Channel Id %d not found... \n", id_inputted);
@@ -241,32 +273,6 @@ int main(int argc, char *argv[])
 
         //     printf("\nType Command: ");
         // }
-
-        else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
-                 id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        { // // User enters UNSUB <channel id>
-            printf("\n%s  %d\n", command_input, id_inputted);
-            id_inputted = RESET_TO_ZERO;
-
-            printf("\nType Command: ");
-        }
-        else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
-                     id_inputted < MIN_CHANNELS ||
-                 id_inputted > MAX_CHANNELS)
-        {
-            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
-            id_inputted = RESET_TO_ZERO;
-
-            printf("\nType Command: ");
-        }
-        else if (strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0 &&
-                 id_inputted == 0)
-        {
-            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
-            id_inputted = RESET_TO_ZERO;
-
-            printf("\nType Command: ");
-        }
         // TOD: BUG = LIVEFEED 0, LIVEFEED1 Make this true. Fix: Trim the input? regex?
         else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 && id_inputted == 0)
         { // User enters LIVEFEED only
