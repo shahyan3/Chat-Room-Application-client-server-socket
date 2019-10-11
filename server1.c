@@ -106,6 +106,7 @@ struct response
     message_t message;
     int error;
     int channel_id;
+    int unReadMessagesCount;
 };
 
 /*
@@ -142,7 +143,9 @@ message_t readNextMsgFromChannel(channel_t *channel, client_t *client);
 
 int isClientSubscribedToAnyChannel(int client_id);
 
-response_t createServerResponse(message_t *message, client_t *client, int channel_id);
+int getNextNthMessageCount(int client_id);
+
+response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount);
 int sendResponse(response_t serverResponse, int sock_id);
 
 message_t readNextMsgFromAllChannel(int clientID); // next no id
@@ -376,7 +379,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     if (&successMessage != NULL)
                     {
-                        response_t response = createServerResponse(&successMessage, client, request->channelID);
+                        response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
                         sendResponse(response, new_fd);
                     }
                 }
@@ -458,7 +461,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     if (&successMessage != NULL)
                     {
-                        response_t response = createServerResponse(&successMessage, client, request->channelID);
+                        response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
                         sendResponse(response, new_fd);
                     }
                 }
@@ -569,7 +572,7 @@ int handleClientRequests(request_t *request, client_t *client)
                     { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                         // create server response to client WITH MESSAGE
-                        response_t response = createServerResponse(&unreadMessage, client, request->channelID);
+                        response_t response = createServerResponse(&unreadMessage, client, request->channelID, -1);
 
                         if (response.error == 0)
                         {
@@ -645,7 +648,9 @@ int handleClientRequests(request_t *request, client_t *client)
         int count = 1;
         channel_t *channel;
 
-        int notSubscribed = isClientSubscribedToAnyChannel(request->clientID);
+        int totalUnreadMessageCount;
+
+        int notSubscribed = isClientSubscribedToAnyChannel(request->clientID); // TODO TMRW
 
         if (notSubscribed == 1)
         { // client not subscribed to any channel
@@ -663,6 +668,9 @@ int handleClientRequests(request_t *request, client_t *client)
 
             return 0;
         }
+
+        // returns an integer that is the total number of next Unread Message in all channels for given client
+        totalUnreadMessageCount = getNextNthMessageCount(request->clientID);
 
         // Client subscribed to at least one channel at this point.
         while (count <= MAX_CHANNELS)
@@ -685,7 +693,7 @@ int handleClientRequests(request_t *request, client_t *client)
                         { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                             // create server response to client WITH MESSAGE
-                            response_t response = createServerResponse(&unreadMessage, client, channel->channelID);
+                            response_t response = createServerResponse(&unreadMessage, client, channel->channelID, totalUnreadMessageCount);
 
                             if (response.error == 0)
                             {
@@ -695,6 +703,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                                 printf("\nClientID: %d\n", response.clientID);
                                 printf("Next message : %s\n", response.message.content);
+                                printf("UnReadMessageCOUNT : %d\n", response.unReadMessagesCount);
                                 printf("Error status : %d\n", response.error);
                                 printf("\n");
                             }
@@ -751,7 +760,8 @@ int handleClientRequests(request_t *request, client_t *client)
             //     }
             // }
 
-            count++; // increment to next channel id
+            count++;                   // increment to next channel id
+            totalUnreadMessageCount--; // decrement the total count of next Unread messages client server needs to wait for
         }
 
         // print_subscribers();
@@ -777,6 +787,40 @@ int parseRequest(int new_fd, char *clientRequest, char *user_command, char *chan
     string_ptr = strtok(NULL, delim);
 
     return 0;
+}
+
+// Calculate the total number of next unread message client has in all the channels it is subscribed too
+// returns an integer that is the total number of next Unread Message in all channels for given client
+
+int getNextNthMessageCount(int client_id)
+{
+    int count = 0;
+    int channelCount = 1;
+
+    client_t *client;
+    channel_t *channel;
+
+    while (channelCount <= MAX_CHANNELS)
+    {
+        channel = getChannel(channelCount);
+
+        if (channel != NULL)
+        {
+            client = findSubscriberInChannel(channel, client_id);
+
+            if (client != NULL)
+            { // client found in one of the channels
+                if (client->unReadMsg > 0)
+                {
+                    count++;
+                }
+            }
+        }
+
+        channelCount++;
+    }
+
+    return count;
 }
 
 int isClientSubscribedToAnyChannel(int client_id)
@@ -891,9 +935,14 @@ response_t createServerErrorResponse(message_t *message)
 }
 
 // Should i return a pointer response instead since using malloc? ask tutor
-response_t createServerResponse(message_t *message, client_t *client, int channel_id)
+response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount)
 {
     response_t *response = malloc(sizeof(response_t));
+
+    if (unReadMessageCount != -1)
+    {
+        response->unReadMessagesCount = unReadMessageCount;
+    }
 
     if (message != NULL)
     {

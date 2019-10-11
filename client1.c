@@ -65,6 +65,7 @@ struct response
     message_t message;
     int error;
     int channel_id;
+    int unReadMessagesCount;
 };
 
 /*
@@ -270,22 +271,48 @@ int main(int argc, char *argv[])
 
                     while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
+                        if (serverResponse.unReadMessagesCount >= 1)
+                        {
+                            if (serverResponse.error == 0)
+                            {
+                                printf("\n===============================================\n");
+                                printf("            SERVER RESPONSE (Success!)         \n\n");
+                                printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
+                                printf("===============================================\n");
+                            }
+                            else
+                            {
+                                printf("\n ===============================================\n");
+                                printf("|            SERVER RESPONSE (Error)              \n");
+                                printf("| %s ", serverResponse.message.content);
+                                printf("\n ===============================================\n");
+                            }
 
-                        if (serverResponse.error == 0)
-                        {
-                            printf("\n===============================================\n");
-                            printf("            SERVER RESPONSE (Success!)         \n\n");
-                            printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                            printf("===============================================\n");
-                        }
-                        else
-                        {
-                            printf("\n ===============================================\n");
-                            printf("|            SERVER RESPONSE (Error)              \n");
-                            printf("| %s ", serverResponse.message.content);
-                            printf("\n ===============================================\n");
+                            if (serverResponse.unReadMessagesCount == 1)
+                            { // Last unreadCount displayed, break the recieving steam loop
+                                break;
+                            }
                         }
                     }
+
+                    // while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
+                    // {
+
+                    //     if (serverResponse.error == 0)
+                    //     {
+                    //         printf("\n===============================================\n");
+                    //         printf("            SERVER RESPONSE (Success!)         \n\n");
+                    //         printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
+                    //         printf("===============================================\n");
+                    //     }
+                    //     else
+                    //     {
+                    //         printf("\n ===============================================\n");
+                    //         printf("|            SERVER RESPONSE (Error)              \n");
+                    //         printf("| %s ", serverResponse.message.content);
+                    //         printf("\n ===============================================\n");
+                    //     }
+                    // }
                 }
             }
             else
