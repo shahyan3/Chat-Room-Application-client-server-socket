@@ -105,6 +105,7 @@ struct response
     int clientID;
     message_t message;
     int error;
+    int channel_id;
 };
 
 /*
@@ -114,6 +115,7 @@ struct response
 message_t createStatusResponseMessage(char *message, int clientID);
 response_t createServerErrorResponse(message_t *message);
 
+// SUBSCRIBE AND UNSUBSCRIBE FUNCS
 message_t *findLastMsgInLinkedList(channel_t channel);
 
 void subscribe(client_t *client_, int channel_id);
@@ -138,7 +140,9 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client);
 
 message_t readNextMsgFromChannel(channel_t *channel, client_t *client);
 
-response_t createServerResponse(message_t *message, client_t *client);
+int isClientSubscribedToAnyChannel(int client_id);
+
+response_t createServerResponse(message_t *message, client_t *client, int channel_id);
 int sendResponse(response_t serverResponse, int sock_id);
 
 message_t readNextMsgFromAllChannel(int clientID); // next no id
@@ -311,6 +315,7 @@ int main(int argc, char *argv[])
 
 int handleClientRequests(request_t *request, client_t *client)
 {
+    printf("\n --> next %d \n", request->channelID);
 
     if (request->commandID == SUB)
     { // Subscribe to Channel request
@@ -371,7 +376,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     if (&successMessage != NULL)
                     {
-                        response_t response = createServerResponse(&successMessage, client);
+                        response_t response = createServerResponse(&successMessage, client, request->channelID);
                         sendResponse(response, new_fd);
                     }
                 }
@@ -453,7 +458,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     if (&successMessage != NULL)
                     {
-                        response_t response = createServerResponse(&successMessage, client);
+                        response_t response = createServerResponse(&successMessage, client, request->channelID);
                         sendResponse(response, new_fd);
                     }
                 }
@@ -523,11 +528,10 @@ int handleClientRequests(request_t *request, client_t *client)
         }
         else
         {
-            char *message = "Channel id given not found!";
-            printf("\n %s\n", message);
+            char *msg = "Invalid channel: ";
+            char *message_ptr = parseMessage(msg, request->channelID);
 
-            // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
-            message_t errorMessage = createStatusResponseMessage(message, request->clientID);
+            message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
             if (&errorMessage != NULL)
             {
@@ -543,9 +547,9 @@ int handleClientRequests(request_t *request, client_t *client)
         return 0;
     }
 
-    if (request->commandID == NEXT_ID && request->channelID)
+    if (request->commandID == NEXT_ID && request->channelID != NO_CHANNEL)
     { // READ message to channel
-        printf("\nServer: NEXT id %d request recevied.\n", request->channelID);
+        printf("\nServer: NEXT WITH id %d request recevied.\n", request->channelID);
 
         channel_t *channel;
 
@@ -565,7 +569,7 @@ int handleClientRequests(request_t *request, client_t *client)
                     { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                         // create server response to client WITH MESSAGE
-                        response_t response = createServerResponse(&unreadMessage, client);
+                        response_t response = createServerResponse(&unreadMessage, client, request->channelID);
 
                         if (response.error == 0)
                         {
@@ -601,26 +605,26 @@ int handleClientRequests(request_t *request, client_t *client)
             }
             else
             {
-                char *message = "Err. Client not subscribed to given channel";
-                printf("\n %s\n", message);
 
-                // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
-                message_t noClientSubMsg = createStatusResponseMessage(message, request->clientID);
+                char *msg = "Not subscribed to channel: ";
+                char *message_ptr = parseMessage(msg, request->channelID);
 
-                if (&noClientSubMsg != NULL)
+                message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
+
+                if (&errorMessage != NULL)
                 {
-                    response_t response = createServerErrorResponse(&noClientSubMsg);
+                    response_t response = createServerErrorResponse(&errorMessage);
                     sendResponse(response, new_fd);
                 }
             }
         }
         else
         {
-            char *message = "Channel id given not found!";
-            printf("\n %s\n", message);
 
-            // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
-            message_t errorMessage = createStatusResponseMessage(message, request->clientID);
+            char *msg = "Invalid channel: ";
+            char *message_ptr = parseMessage(msg, request->channelID);
+
+            message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
             if (&errorMessage != NULL)
             {
@@ -635,50 +639,124 @@ int handleClientRequests(request_t *request, client_t *client)
     }
 
     if (request->commandID == NEXT && request->channelID == NO_CHANNEL)
-    {
-        printf("\nSERVER: Next without <id> request received.\n");
+    { // NEXT no id
+        printf("\nSERVER: Next WITHOUT <%d> request received.\n", request->channelID);
 
-        // int totalUnreadNextMsg = 0;
-        // totalUnreadNextMsg = nextMessageCountInChannels(client->clientID);
+        int count = 1;
+        channel_t *channel;
 
-        // printf("\n@ total unreadMsgCount %d\n\n", totalUnreadNextMsg);
+        int notSubscribed = isClientSubscribedToAnyChannel(request->clientID);
 
-        // if (client->unReadMsg > 0)
-        // {
-        //     while (totalUnreadNextMsg != 0)
-        //     {
-        //         message_t unReadMessage = readNextMsgFromAllChannel(request->clientID);
+        if (notSubscribed == 1)
+        { // client not subscribed to any channel
 
-        //         if (&unReadMessage != NULL)
-        //         {
-        //             response_t response = createServerResponse(&unReadMessage, client);
+            char *message = "Not subscribed to any channels.";
 
-        //             // send response to client
-        //             if (sendResponse(response, new_fd) == 1)
-        //             {
-        //                 printf("\nSERVER: Error, failed to sent response to server [NEXT_ID]!\n");
-        //             }
-        //             else
-        //             {
-        //                 printf("\nClient: Successfully sent response to client [NEXT_ID]... \n");
-        //             }
-        //         }
+            // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+            message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
 
-        //         totalUnreadNextMsg -= 1; // decrement next unread message sent count;
-        //     }
-        // }
-        // else
-        // {
-        //     response_t response = createServerResponse(NULL, client);
-        //     if (sendResponse(response, new_fd) == 1)
-        //     {
-        //         printf("\nSERVER: Error, failed to sent response to server [NEXT NO ID]!\n");
-        //     }
-        //     else
-        //     {
-        //         printf("\nClient: Successfully sent response to client [NEXT NO ID]... \n");
-        //     }
-        // }
+            if (&noMsgErrorMessage != NULL)
+            {
+                response_t response = createServerErrorResponse(&noMsgErrorMessage);
+                sendResponse(response, new_fd);
+            }
+
+            return 0;
+        }
+
+        // Client subscribed to at least one channel at this point.
+        while (count <= MAX_CHANNELS)
+        {
+            channel = getChannel(count); // find the channel given channel id
+
+            // printf("\t-> channel : %d\n", channel->channelID);
+
+            if (channel != NULL)
+            {
+                client_t *client = findSubscriberInChannel(channel, request->clientID);
+
+                if (client != NULL)
+                {
+                    if (client->unReadMsg > 0)
+                    {
+                        message_t unreadMessage = readNextMsgFromChannel(channel, client);
+
+                        if (&unreadMessage != NULL)
+                        { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
+
+                            // create server response to client WITH MESSAGE
+                            response_t response = createServerResponse(&unreadMessage, client, channel->channelID);
+
+                            if (response.error == 0)
+                            {
+                                printf("\n________________________ \n");
+                                printf("NEXT %d Message Sending...|\n", request->channelID);
+                                printf("__________________________ \n");
+
+                                printf("\nClientID: %d\n", response.clientID);
+                                printf("Next message : %s\n", response.message.content);
+                                printf("Error status : %d\n", response.error);
+                                printf("\n");
+                            }
+
+                            // send response to client
+                            sendResponse(response, new_fd);
+                            sleep(1);
+
+                            printf("DONE!\n");
+                        }
+                    }
+                    else
+                    {
+
+                        char *message = "No new messages found in channel!";
+
+                        // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+                        message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
+
+                        if (&noMsgErrorMessage != NULL)
+                        {
+                            response_t response = createServerErrorResponse(&noMsgErrorMessage);
+                            sendResponse(response, new_fd);
+                        }
+                    }
+                }
+                // else
+                // {
+                //     char *message = "Not subscribed to any channels.";
+                //     printf("\n %s\n", message);
+
+                //     // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+                //     message_t noClientSubMsg = createStatusResponseMessage(message, request->clientID);
+
+                //     if (&noClientSubMsg != NULL)
+                //     {
+                //         response_t response = createServerErrorResponse(&noClientSubMsg);
+                //         sendResponse(response, new_fd);
+                //     }
+                // }
+            }
+            // else
+            // {
+            //     char *message = "Channel id given not found!";
+            //     printf("\n %s\n", message);
+
+            //     // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+            //     message_t errorMessage = createStatusResponseMessage(message, request->clientID);
+
+            //     if (&errorMessage != NULL)
+            //     {
+            //         response_t response = createServerErrorResponse(&errorMessage);
+            //         sendResponse(response, new_fd);
+            //     }
+            // }
+
+            count++; // increment to next channel id
+        }
+
+        // print_subscribers();
+
+        return 0;
     }
 }
 
@@ -699,6 +777,31 @@ int parseRequest(int new_fd, char *clientRequest, char *user_command, char *chan
     string_ptr = strtok(NULL, delim);
 
     return 0;
+}
+
+int isClientSubscribedToAnyChannel(int client_id)
+{
+    int channelCount = 1;
+    client_t *client;
+    channel_t *channel;
+
+    while (channelCount <= MAX_CHANNELS)
+    {
+        channel = getChannel(channelCount);
+
+        if (channel != NULL)
+        {
+            client = findSubscriberInChannel(channel, client_id);
+
+            if (client != NULL)
+            { // client found in one of the channels
+                return 0;
+            }
+        }
+
+        channelCount++;
+    }
+    return 1; // client not sub'd to any channels
 }
 
 char *parseMessage(char *msg, int channel_id)
@@ -788,7 +891,7 @@ response_t createServerErrorResponse(message_t *message)
 }
 
 // Should i return a pointer response instead since using malloc? ask tutor
-response_t createServerResponse(message_t *message, client_t *client)
+response_t createServerResponse(message_t *message, client_t *client, int channel_id)
 {
     response_t *response = malloc(sizeof(response_t));
 
@@ -799,6 +902,7 @@ response_t createServerResponse(message_t *message, client_t *client)
         response->clientID = client->clientID;
         response->message = *message;
         response->error = 0;
+        response->channel_id = channel_id;
     }
     else
     {
@@ -1108,16 +1212,11 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
     }
     else
     {
-
-        printf("\n-->YES 111111111111\n");
-
         while (currentNode != NULL)
         {
 
             if (currentNode->messageID == clientsNextMessageToReadIndex)
             {
-                printf("\n-->YES 22222\n"); // MESSAGE ID is starting at 3 for channel 2, therefore doesn't read. #bug
-
                 // if messageID is the next in messageQueueIndex for client
                 unreadMessage = *currentNode;
                 client->messageQueueIndex += 1; // update messageQueueIndex
@@ -1128,7 +1227,6 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
             currentNode = currentNode->next;
         }
 
-        printf("\n CLIENT UPDATED unreads??? %d\n", client->unReadMsg);
         return unreadMessage;
     }
 }
