@@ -652,6 +652,8 @@ int handleClientRequests(request_t *request, client_t *client)
 
         int notSubscribed = isClientSubscribedToAnyChannel(request->clientID); // TODO TMRW
 
+        printf("IS SUBSCRIBED ? %d", notSubscribed);
+
         if (notSubscribed == 1)
         { // client not subscribed to any channel
 
@@ -664,6 +666,7 @@ int handleClientRequests(request_t *request, client_t *client)
             {
                 response_t response = createServerErrorResponse(&noMsgErrorMessage);
                 sendResponse(response, new_fd);
+                printf("\nerror response send \n");
             }
 
             return 0;
@@ -825,7 +828,7 @@ int getNextNthMessageCount(int client_id)
 
 int isClientSubscribedToAnyChannel(int client_id)
 {
-    int channelCount = 1;
+    int channelCount = 0;
     client_t *client;
     channel_t *channel;
 
@@ -839,6 +842,7 @@ int isClientSubscribedToAnyChannel(int client_id)
 
             if (client != NULL)
             { // client found in one of the channels
+                printf("\nclinet found id is %d\n", client->clientID);
                 return 0;
             }
         }

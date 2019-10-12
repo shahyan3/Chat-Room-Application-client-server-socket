@@ -271,6 +271,16 @@ int main(int argc, char *argv[])
 
                     while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
+                        if (serverResponse.error == 1)
+                        { // IF USER TYPES "NEXT" WITHOUT SUBSCRIBING TO ANY CHANNEL. Display error.
+                            printf("\n ===============================================\n");
+                            printf("|            SERVER RESPONSE (Error)              \n");
+                            printf("| %s ", serverResponse.message.content);
+                            printf("\n ===============================================\n");
+
+                            break;
+                        }
+
                         if (serverResponse.unReadMessagesCount >= 1)
                         {
                             if (serverResponse.error == 0)
