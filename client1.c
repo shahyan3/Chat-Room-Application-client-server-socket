@@ -14,9 +14,9 @@
 #define RETURNED_ERROR -1
 #define SERVER_ON_CONNECT_MSG_SIZE 40
 #define MIN_CHANNELS 1
-#define MAX_CHANNELS 3
-#define RESET_TO_ZERO 0
-#define NO_CHANNEL_ID 0
+#define MAX_CHANNELS 4
+#define RESET_INPUT -1
+#define NO_CHANNEL_ID -1
 
 #define MAXDATASIZE 100 /* max number of bytes we can get at once */
 
@@ -33,6 +33,10 @@
 
 #define NEXT 5
 #define LIVEFEED 6
+
+/* BOOLEAN */
+#define LIVEFEED_TRUE 0
+#define LIVEFEED_FALSE 1
 
 /*
     STRUCTS
@@ -55,6 +59,7 @@ struct request
     int channelID;
     int clientID;
     message_t client_message;
+    int liveFeed;
 };
 
 typedef struct response response_t;
@@ -84,7 +89,7 @@ void display_menu();
 
 int sendRequest(request_t clientRequest, int sock_id);
 
-request_t createRequest(int command, int channel_id, int clientID, message_t *message);
+request_t createRequest(int command, int channel_id, int clientID, message_t *message, int liveFeedFlag);
 
 int connection_success(int sock_id);
 
@@ -138,7 +143,7 @@ int main(int argc, char *argv[])
     int clientID = connection_success(sockfd);
     // printf("checking client id %d", clientID);
 
-    int id_inputted = RESET_TO_ZERO;
+    int id_inputted = RESET_INPUT;
 
     int *id_ptr = &id_inputted; /* Pointer to user inputted channel id*/
 
@@ -170,7 +175,7 @@ int main(int argc, char *argv[])
         {
             printf("SUB %d", id_inputted);
 
-            request_t request = createRequest(SUB, id_inputted, clientID, NULL);
+            request_t request = createRequest(SUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
             if (sendRequest(request, sockfd) == 1)
             {
@@ -204,7 +209,7 @@ int main(int argc, char *argv[])
                 }
             }
 
-            id_inputted = RESET_TO_ZERO;
+            id_inputted = RESET_INPUT;
 
             printf("\nType Command: ");
         }
@@ -212,7 +217,7 @@ int main(int argc, char *argv[])
         {
             printf("UNSUB %d", id_inputted);
 
-            request_t request = createRequest(UNSUB, id_inputted, clientID, NULL);
+            request_t request = createRequest(UNSUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
             if (sendRequest(request, sockfd) == 1)
             {
@@ -246,20 +251,20 @@ int main(int argc, char *argv[])
                 }
             }
 
-            id_inputted = RESET_TO_ZERO;
+            id_inputted = RESET_INPUT;
 
             printf("\nType Command: ");
         }
 
         else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0)
         { // // User enters NEXT <channel id>
-            printf("\n Next ID %s  %d\n", command_input, id_inputted);
+            // printf("\n Next ID %s  %d\n", command_input, id_inputted);
 
             request_t request;
 
             if (id_inputted == NO_CHANNEL_ID)
             { // NEXT without id
-                request = createRequest(NEXT, id_inputted, clientID, NULL);
+                request = createRequest(NEXT, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
                 if (sendRequest(request, sockfd) == 1)
                 {
@@ -267,8 +272,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    printf("\nClient: Successfully sent NEXT message request to server...\n");
-
+                    // printf("\nClient: Successfully sent NEXT message request to server...\n");
                     while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
                         if (serverResponse.error == 1)
@@ -281,7 +285,7 @@ int main(int argc, char *argv[])
                             break;
                         }
 
-                        if (serverResponse.unReadMessagesCount >= 1)
+                        if (serverResponse.unReadMessagesCount >= 1) //Todo : error
                         {
                             if (serverResponse.error == 0)
                             {
@@ -304,30 +308,11 @@ int main(int argc, char *argv[])
                             }
                         }
                     }
-
-                    // while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
-                    // {
-
-                    //     if (serverResponse.error == 0)
-                    //     {
-                    //         printf("\n===============================================\n");
-                    //         printf("            SERVER RESPONSE (Success!)         \n\n");
-                    //         printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                    //         printf("===============================================\n");
-                    //     }
-                    //     else
-                    //     {
-                    //         printf("\n ===============================================\n");
-                    //         printf("|            SERVER RESPONSE (Error)              \n");
-                    //         printf("| %s ", serverResponse.message.content);
-                    //         printf("\n ===============================================\n");
-                    //     }
-                    // }
                 }
             }
             else
             { // NEXT with id
-                request = createRequest(NEXT_ID, id_inputted, clientID, NULL);
+                request = createRequest(NEXT_ID, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
                 if (sendRequest(request, sockfd) == 1)
                 {
@@ -335,7 +320,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    printf("\nClient: Successfully sent NEXT message request to server...\n");
+                    // printf("\nClient: Successfully sent NEXT message request to server...\n");
 
                     if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
@@ -358,58 +343,81 @@ int main(int argc, char *argv[])
                 }
             }
 
-            id_inputted = RESET_TO_ZERO;
+            id_inputted = RESET_INPUT;
+
+            printf("\n => Type Command: ");
+        }
+
+        // TOD: BUG = LIVEFEED 0, LIVEFEED1 Make this true. Fix: Trim the input? regex?
+        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0)
+        { // User enters LIVEFEED only
+            printf("\n CLIENT: LIVE FEED with ID... %s  \n", command_input);
+
+            printf("id %d", id_inputted);
+
+            request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
+
+            if (sendRequest(request, sockfd) == 1)
+            {
+                printf("Client: Error, LIVEFEED with id request to server failed\n");
+            }
+            else
+            {
+                // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
+
+                if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+                {
+                    perror("Error! Failed to receive response from server!\n");
+                    printf("\n Error! Failed to receive response from server!\n");
+                }
+                else
+                {
+                    if (serverResponse.error == 0)
+                    {
+                        printf("\n===============================================\n");
+                        printf("            SERVER RESPONSE (Success!)         \n");
+                        printf(" \t\t%s\n", serverResponse.message.content);
+                        printf("\n===============================================\n");
+                    }
+                    else
+                    {
+                        printf("\n ===============================================\n");
+                        printf("|            SERVER RESPONSE (Error)              \n");
+                        printf("|%s", serverResponse.message.content);
+                        printf("\n ===============================================\n");
+                    }
+                }
+            }
+
+            id_inputted = RESET_INPUT;
 
             printf("\nType Command: ");
         }
 
-        // else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 &&
-        //              id_inputted < MIN_CHANNELS ||
-        //          id_inputted > MAX_CHANNELS)
-        // {
-        //     printf("\n ERR! Channel Id %d not found... \n", id_inputted);
-        //     id_inputted = RESET_TO_ZERO;
+        // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
+        //          id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
+        // { // // User enters LIVEFEED <channel id>
+        //     // printf("\n WITH ID %s  %d\n", command_input, id_inputted);
+
+        //     id_inputted = RESET_INPUT;
 
         //     printf("\nType Command: ");
         // }
+        // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
+        //              id_inputted < MIN_CHANNELS ||
+        //          id_inputted > MAX_CHANNELS)
+        // {
+        //     // printf("\n ERR! Channel Id %d not found... \n", id_inputted);
+        //     id_inputted = RESET_INPUT;
 
-        // else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0 && id_inputted == 0)
-        // { //User enters NEXT only
-        //     // printf("\n NO ID - SHOW  *UNREAD* MSG FROM ALL CHANNELS, OK... %s  \n", command_input);
-
-        //     printf("\nNEXT command \n");
+        //     printf("\nType Command: ");
         // }
-
-        // TOD: BUG = LIVEFEED 0, LIVEFEED1 Make this true. Fix: Trim the input? regex?
-        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 && id_inputted == 0)
-        { // User enters LIVEFEED only
-            printf("\n NO ID, Continuosly show msg from all channels... %s  \n", command_input);
-            printf("\nType Command: ");
-        }
-        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
-                 id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        { // // User enters LIVEFEED <channel id>
-            // printf("\n WITH ID %s  %d\n", command_input, id_inputted);
-
-            id_inputted = RESET_TO_ZERO;
-
-            printf("\nType Command: ");
-        }
-        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
-                     id_inputted < MIN_CHANNELS ||
-                 id_inputted > MAX_CHANNELS)
-        {
-            printf("\n ERR! Channel Id %d not found... \n", id_inputted);
-            id_inputted = RESET_TO_ZERO;
-
-            printf("\nType Command: ");
-        }
 
         else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
         { // // User enters BYE
             printf("\n %s \n", command_input);
             printf("\n BYE BYE! \n");
-            id_inputted = RESET_TO_ZERO;
+            id_inputted = RESET_INPUT;
 
             sleep(1);
             exit(1);
@@ -417,7 +425,7 @@ int main(int argc, char *argv[])
 
         else if (strncmp(command_input, "SEND", strlen("SEND")) == 0)
         { // User enters SEND<channelid><message>
-            // printf("\n%s  %d \n%s\n", command_input, id_inputted);
+            // printf("\n=> %s  %d \n", command_input, id_inputted);
 
             // Ask for message input.
             printf("Enter Your Message: ");
@@ -433,7 +441,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                request_t request = createRequest(SEND, id_inputted, clientID, &client_message);
+                request_t request = createRequest(SEND, id_inputted, clientID, &client_message, LIVEFEED_FALSE);
 
                 if (sendRequest(request, sockfd) == 1)
                 {
@@ -441,7 +449,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    printf("\nClient: Successfully sent message request to server...\n");
+                    // printf("\nClient: Successfully sent message request to server...\n");
 
                     if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
@@ -453,14 +461,14 @@ int main(int argc, char *argv[])
                 }
             }
 
-            id_inputted = RESET_TO_ZERO;
+            id_inputted = RESET_INPUT;
 
             printf("\nType Command: ");
         }
         else
         {
             printf("\nIncorrect Input.\n");
-            id_inputted = RESET_TO_ZERO;
+            id_inputted = RESET_INPUT;
 
             printf("\nType Command: ");
         }
@@ -508,7 +516,7 @@ void display_menu()
 }
 
 // Creates a request object and checks if message included or not
-request_t createRequest(int command, int channel_id, int clientID, message_t *message)
+request_t createRequest(int command, int channel_id, int clientID, message_t *message, int liveFeedFlag)
 {
 
     request_t clientRequest;
@@ -516,6 +524,8 @@ request_t createRequest(int command, int channel_id, int clientID, message_t *me
     clientRequest.commandID = command;
     clientRequest.channelID = channel_id;
     clientRequest.clientID = clientID;
+    clientRequest.liveFeed = liveFeedFlag;
+
     if (message != NULL)
     {
         clientRequest.client_message = *message;
