@@ -272,9 +272,13 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    // printf("\nClient: Successfully sent NEXT message request to server...\n");
+                    printf("\nClient: Successfully sent NEXT message request to server...\n");
+
+                    // printf("\n 0.0 serverResponse %d\n", serverResponse.unReadMessagesCount);
+
                     while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
+
                         if (serverResponse.error == 1)
                         { // IF USER TYPES "NEXT" WITHOUT SUBSCRIBING TO ANY CHANNEL. Display error.
                             printf("\n ===============================================\n");
@@ -294,16 +298,10 @@ int main(int argc, char *argv[])
                                 printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
                                 printf("===============================================\n");
                             }
-                            else
-                            {
-                                printf("\n ===============================================\n");
-                                printf("|            SERVER RESPONSE (Error)              \n");
-                                printf("| %s ", serverResponse.message.content);
-                                printf("\n ===============================================\n");
-                            }
 
                             if (serverResponse.unReadMessagesCount == 1)
                             { // Last unreadCount displayed, break the recieving steam loop
+                                printf("\nONEEEEEEEEEEEEEEEE\n");
                                 break;
                             }
                         }
@@ -320,7 +318,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    // printf("\nClient: Successfully sent NEXT message request to server...\n");
+                    printf("\nClient: Successfully sent NEXT message request to server...\n");
 
                     if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
