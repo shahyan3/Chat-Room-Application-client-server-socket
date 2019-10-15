@@ -51,7 +51,7 @@ struct message
     int messageID;
     int ownerID;
     char content[MAX_MESSAGE_LENGTH];
-    message_t *next;
+    // message_t *next;
 };
 struct request
 {
@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                // printf("\nClient: Successfully sub request to server...\n");
+                printf("\nClient: Successfully sub request to server...\n");
 
                 if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
                 {
@@ -213,184 +213,184 @@ int main(int argc, char *argv[])
 
             printf("\nType Command: ");
         }
-        else if ((strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0))
-        {
-            printf("UNSUB %d", id_inputted);
+        // else if ((strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0))
+        // {
+        //     printf("UNSUB %d", id_inputted);
 
-            request_t request = createRequest(UNSUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
+        //     request_t request = createRequest(UNSUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
-            if (sendRequest(request, sockfd) == 1)
-            {
-                printf("Client: Error, UNSUB request to server failed\n");
-            }
-            else
-            {
-                // printf("\nClient: Successfully sent UNSUB request to server...\n");
+        //     if (sendRequest(request, sockfd) == 1)
+        //     {
+        //         printf("Client: Error, UNSUB request to server failed\n");
+        //     }
+        //     else
+        //     {
+        //         // printf("\nClient: Successfully sent UNSUB request to server...\n");
 
-                if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
-                {
-                    perror("Error! Failed to receive response from server!\n");
-                    printf("\n Error! Failed to receive response from server!\n");
-                }
-                else
-                {
-                    if (serverResponse.error == 0)
-                    {
-                        printf("\n===============================================\n");
-                        printf("            SERVER RESPONSE (Success!)         \n");
-                        printf(" \t\t%s\n", serverResponse.message.content);
-                        printf("\n===============================================\n");
-                    }
-                    else
-                    {
-                        printf("\n ===============================================\n");
-                        printf("|            SERVER RESPONSE (Error)              \n");
-                        printf("|%s", serverResponse.message.content);
-                        printf("\n ===============================================\n");
-                    }
-                }
-            }
+        //         if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+        //         {
+        //             perror("Error! Failed to receive response from server!\n");
+        //             printf("\n Error! Failed to receive response from server!\n");
+        //         }
+        //         else
+        //         {
+        //             if (serverResponse.error == 0)
+        //             {
+        //                 printf("\n===============================================\n");
+        //                 printf("            SERVER RESPONSE (Success!)         \n");
+        //                 printf(" \t\t%s\n", serverResponse.message.content);
+        //                 printf("\n===============================================\n");
+        //             }
+        //             else
+        //             {
+        //                 printf("\n ===============================================\n");
+        //                 printf("|            SERVER RESPONSE (Error)              \n");
+        //                 printf("|%s", serverResponse.message.content);
+        //                 printf("\n ===============================================\n");
+        //             }
+        //         }
+        //     }
 
-            id_inputted = RESET_INPUT;
+        //     id_inputted = RESET_INPUT;
 
-            printf("\nType Command: ");
-        }
+        //     printf("\nType Command: ");
+        // }
 
-        else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0)
-        { // // User enters NEXT <channel id>
-            // printf("\n Next ID %s  %d\n", command_input, id_inputted);
+        // else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0)
+        // { // // User enters NEXT <channel id>
+        //     // printf("\n Next ID %s  %d\n", command_input, id_inputted);
 
-            request_t request;
+        //     request_t request;
 
-            if (id_inputted == NO_CHANNEL_ID)
-            { // NEXT without id
-                request = createRequest(NEXT, id_inputted, clientID, NULL, LIVEFEED_FALSE);
+        //     if (id_inputted == NO_CHANNEL_ID)
+        //     { // NEXT without id
+        //         request = createRequest(NEXT, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
-                if (sendRequest(request, sockfd) == 1)
-                {
-                    printf("Client: Error, NEXT message request to server failed\n");
-                }
-                else
-                {
-                    printf("\nClient: Successfully sent NEXT message request to server...\n");
+        //         if (sendRequest(request, sockfd) == 1)
+        //         {
+        //             printf("Client: Error, NEXT message request to server failed\n");
+        //         }
+        //         else
+        //         {
+        //             printf("\nClient: Successfully sent NEXT message request to server...\n");
 
-                    // printf("\n 0.0 serverResponse %d\n", serverResponse.unReadMessagesCount);
+        //             // printf("\n 0.0 serverResponse %d\n", serverResponse.unReadMessagesCount);
 
-                    while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
-                    {
+        //             while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
+        //             {
 
-                        if (serverResponse.error == 1)
-                        { // IF USER TYPES "NEXT" WITHOUT SUBSCRIBING TO ANY CHANNEL. Display error.
-                            printf("\n ===============================================\n");
-                            printf("|            SERVER RESPONSE (Error)              \n");
-                            printf("| %s ", serverResponse.message.content);
-                            printf("\n ===============================================\n");
+        //                 if (serverResponse.error == 1)
+        //                 { // IF USER TYPES "NEXT" WITHOUT SUBSCRIBING TO ANY CHANNEL. Display error.
+        //                     printf("\n ===============================================\n");
+        //                     printf("|            SERVER RESPONSE (Error)              \n");
+        //                     printf("| %s ", serverResponse.message.content);
+        //                     printf("\n ===============================================\n");
 
-                            break;
-                        }
+        //                     break;
+        //                 }
 
-                        if (serverResponse.unReadMessagesCount >= 1) //Todo : error
-                        {
-                            if (serverResponse.error == 0)
-                            {
-                                printf("\n===============================================\n");
-                                printf("            SERVER RESPONSE (Success!)         \n\n");
-                                printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                                printf("===============================================\n");
-                            }
+        //                 if (serverResponse.unReadMessagesCount >= 1) //Todo : error
+        //                 {
+        //                     if (serverResponse.error == 0)
+        //                     {
+        //                         printf("\n===============================================\n");
+        //                         printf("            SERVER RESPONSE (Success!)         \n\n");
+        //                         printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
+        //                         printf("===============================================\n");
+        //                     }
 
-                            if (serverResponse.unReadMessagesCount == 1)
-                            { // Last unreadCount displayed, break the recieving steam loop
-                                printf("\nONEEEEEEEEEEEEEEEE\n");
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            { // NEXT with id
-                request = createRequest(NEXT_ID, id_inputted, clientID, NULL, LIVEFEED_FALSE);
+        //                     if (serverResponse.unReadMessagesCount == 1)
+        //                     { // Last unreadCount displayed, break the recieving steam loop
+        //                         printf("\nONEEEEEEEEEEEEEEEE\n");
+        //                         break;
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        //     else
+        //     { // NEXT with id
+        //         request = createRequest(NEXT_ID, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
-                if (sendRequest(request, sockfd) == 1)
-                {
-                    printf("Client: Error, NEXT message request to server failed\n");
-                }
-                else
-                {
-                    printf("\nClient: Successfully sent NEXT message request to server...\n");
+        //         if (sendRequest(request, sockfd) == 1)
+        //         {
+        //             printf("Client: Error, NEXT message request to server failed\n");
+        //         }
+        //         else
+        //         {
+        //             printf("\nClient: Successfully sent NEXT message request to server...\n");
 
-                    if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
-                    {
+        //             if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
+        //             {
 
-                        if (serverResponse.error == 0)
-                        {
-                            printf("\n===============================================\n");
-                            printf("            SERVER RESPONSE (Success!)         \n\n");
-                            printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                            printf("===============================================\n");
-                        }
-                        else
-                        {
-                            printf("\n ===============================================\n");
-                            printf("|            SERVER RESPONSE (Error)              \n");
-                            printf("| %s ", serverResponse.message.content);
-                            printf("\n ===============================================\n");
-                        }
-                    }
-                }
-            }
+        //                 if (serverResponse.error == 0)
+        //                 {
+        //                     printf("\n===============================================\n");
+        //                     printf("            SERVER RESPONSE (Success!)         \n\n");
+        //                     printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
+        //                     printf("===============================================\n");
+        //                 }
+        //                 else
+        //                 {
+        //                     printf("\n ===============================================\n");
+        //                     printf("|            SERVER RESPONSE (Error)              \n");
+        //                     printf("| %s ", serverResponse.message.content);
+        //                     printf("\n ===============================================\n");
+        //                 }
+        //             }
+        //         }
+        //     }
 
-            id_inputted = RESET_INPUT;
+        //     id_inputted = RESET_INPUT;
 
-            printf("\n => Type Command: ");
-        }
+        //     printf("\n => Type Command: ");
+        // }
 
         // TOD: BUG = LIVEFEED 0, LIVEFEED1 Make this true. Fix: Trim the input? regex?
-        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0)
-        { // User enters LIVEFEED only
-            printf("\n CLIENT: LIVE FEED with ID... %s  \n", command_input);
+        // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0)
+        // { // User enters LIVEFEED only
+        //     printf("\n CLIENT: LIVE FEED with ID... %s  \n", command_input);
 
-            printf("id %d", id_inputted);
+        //     printf("id %d", id_inputted);
 
-            request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
+        //     request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
 
-            if (sendRequest(request, sockfd) == 1)
-            {
-                printf("Client: Error, LIVEFEED with id request to server failed\n");
-            }
-            else
-            {
-                // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
+        //     if (sendRequest(request, sockfd) == 1)
+        //     {
+        //         printf("Client: Error, LIVEFEED with id request to server failed\n");
+        //     }
+        //     else
+        //     {
+        //         // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
 
-                if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
-                {
-                    perror("Error! Failed to receive response from server!\n");
-                    printf("\n Error! Failed to receive response from server!\n");
-                }
-                else
-                {
-                    if (serverResponse.error == 0)
-                    {
-                        printf("\n===============================================\n");
-                        printf("            SERVER RESPONSE (Success!)         \n");
-                        printf(" \t\t%s\n", serverResponse.message.content);
-                        printf("\n===============================================\n");
-                    }
-                    else
-                    {
-                        printf("\n ===============================================\n");
-                        printf("|            SERVER RESPONSE (Error)              \n");
-                        printf("|%s", serverResponse.message.content);
-                        printf("\n ===============================================\n");
-                    }
-                }
-            }
+        //         if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+        //         {
+        //             perror("Error! Failed to receive response from server!\n");
+        //             printf("\n Error! Failed to receive response from server!\n");
+        //         }
+        //         else
+        //         {
+        //             if (serverResponse.error == 0)
+        //             {
+        //                 printf("\n===============================================\n");
+        //                 printf("            SERVER RESPONSE (Success!)         \n");
+        //                 printf(" \t\t%s\n", serverResponse.message.content);
+        //                 printf("\n===============================================\n");
+        //             }
+        //             else
+        //             {
+        //                 printf("\n ===============================================\n");
+        //                 printf("|            SERVER RESPONSE (Error)              \n");
+        //                 printf("|%s", serverResponse.message.content);
+        //                 printf("\n ===============================================\n");
+        //             }
+        //         }
+        //     }
 
-            id_inputted = RESET_INPUT;
+        //     id_inputted = RESET_INPUT;
 
-            printf("\nType Command: ");
-        }
+        //     printf("\nType Command: ");
+        // }
 
         // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
         //          id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
@@ -411,15 +411,15 @@ int main(int argc, char *argv[])
         //     printf("\nType Command: ");
         // }
 
-        else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
-        { // // User enters BYE
-            printf("\n %s \n", command_input);
-            printf("\n BYE BYE! \n");
-            id_inputted = RESET_INPUT;
+        // else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
+        // { // // User enters BYE
+        //     printf("\n %s \n", command_input);
+        //     printf("\n BYE BYE! \n");
+        //     id_inputted = RESET_INPUT;
 
-            sleep(1);
-            exit(1);
-        }
+        //     sleep(1);
+        //     exit(1);
+        // }
 
         else if (strncmp(command_input, "SEND", strlen("SEND")) == 0)
         { // User enters SEND<channelid><message>
@@ -472,7 +472,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    close(sockfd);
+    // close(sockfd);
 
     return 0;
 }
@@ -559,7 +559,6 @@ int parseUserMessage(message_t *client_message, char *message, int clientID)
         // CRITICAL SECTION msgSendCount should only be incremented one by one by threads ?????********
         strncpy(client_message->content, message, MAX_MESSAGE_LENGTH);
         client_message->ownerID = clientID;
-        client_message->next = NULL;
 
         // CRITICAL SECTION end ********
 
