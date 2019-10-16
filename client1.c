@@ -213,48 +213,48 @@ int main(int argc, char *argv[])
 
             printf("\nType Command: ");
         }
-        // else if ((strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0))
-        // {
-        //     printf("UNSUB %d", id_inputted);
+        else if ((strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0))
+        {
+            printf("UNSUB %d", id_inputted);
 
-        //     request_t request = createRequest(UNSUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
+            request_t request = createRequest(UNSUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
-        //     if (sendRequest(request, sockfd) == 1)
-        //     {
-        //         printf("Client: Error, UNSUB request to server failed\n");
-        //     }
-        //     else
-        //     {
-        //         // printf("\nClient: Successfully sent UNSUB request to server...\n");
+            if (sendRequest(request, sockfd) == 1)
+            {
+                printf("Client: Error, UNSUB request to server failed\n");
+            }
+            else
+            {
+                // printf("\nClient: Successfully sent UNSUB request to server...\n");
 
-        //         if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
-        //         {
-        //             perror("Error! Failed to receive response from server!\n");
-        //             printf("\n Error! Failed to receive response from server!\n");
-        //         }
-        //         else
-        //         {
-        //             if (serverResponse.error == 0)
-        //             {
-        //                 printf("\n===============================================\n");
-        //                 printf("            SERVER RESPONSE (Success!)         \n");
-        //                 printf(" \t\t%s\n", serverResponse.message.content);
-        //                 printf("\n===============================================\n");
-        //             }
-        //             else
-        //             {
-        //                 printf("\n ===============================================\n");
-        //                 printf("|            SERVER RESPONSE (Error)              \n");
-        //                 printf("|%s", serverResponse.message.content);
-        //                 printf("\n ===============================================\n");
-        //             }
-        //         }
-        //     }
+                if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+                {
+                    perror("Error! Failed to receive response from server!\n");
+                    printf("\n Error! Failed to receive response from server!\n");
+                }
+                else
+                {
+                    if (serverResponse.error == 0)
+                    {
+                        printf("\n===============================================\n");
+                        printf("            SERVER RESPONSE (Success!)         \n");
+                        printf(" \t\t%s\n", serverResponse.message.content);
+                        printf("\n===============================================\n");
+                    }
+                    else
+                    {
+                        printf("\n ===============================================\n");
+                        printf("|            SERVER RESPONSE (Error)              \n");
+                        printf("|%s", serverResponse.message.content);
+                        printf("\n ===============================================\n");
+                    }
+                }
+            }
 
-        //     id_inputted = RESET_INPUT;
+            id_inputted = RESET_INPUT;
 
-        //     printf("\nType Command: ");
-        // }
+            printf("\nType Command: ");
+        }
 
         // else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0)
         // { // // User enters NEXT <channel id>

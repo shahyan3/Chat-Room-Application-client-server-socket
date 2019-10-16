@@ -141,7 +141,7 @@ response_t createServerErrorResponse(message_t *message);
 
 void subscribe(client_t *client_, int channel_id);
 
-// int unSubscribe(int channel_id, int client_id);
+int unSubscribe(int channel_id, int client_id);
 
 char *parseMessage(char *msg, int channel_id);
 
@@ -393,16 +393,16 @@ int handleClientRequests(request_t *request, client_t *client)
                 { // Client already subscribed
                     printf("is Client = NOT NULL (already subscribed)\n");
 
-                    //     char *msg = "Already subscribed to channel: ";
-                    //     char *message_ptr = parseMessage(msg, request->channelID);
+                    char *msg = "Already subscribed to channel: ";
+                    char *message_ptr = parseMessage(msg, request->channelID);
 
-                    //     message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
+                    message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                    //     if (&errorMessage != NULL)
-                    //     {
-                    //         response_t response = createServerErrorResponse(&errorMessage);
-                    //         sendResponse(response, new_fd);
-                    //     }
+                    if (&errorMessage != NULL)
+                    {
+                        response_t response = createServerErrorResponse(&errorMessage);
+                        sendResponse(response, new_fd);
+                    }
                 }
 
                 return 0;
@@ -410,87 +410,87 @@ int handleClientRequests(request_t *request, client_t *client)
         }
     }
 
-    // else if (request->commandID == UNSUB)
-    // { // UNSUB to Channel request
+    else if (request->commandID == UNSUB)
+    { // UNSUB to Channel request
 
-    //     channel_t *channel;
-    //     client_t *isClient;
+        channel_t *channel;
+        client_t *isClient;
 
-    //     if (request->channelID == NO_CHANNEL)
-    //     { // Client sent SUB with no id
+        if (request->channelID == NO_CHANNEL)
+        { // Client sent SUB with no id
 
-    //         // create error message
-    //         char *message = "No channel id given";
+            // create error message
+            char *message = "No channel id given";
 
-    //         message_t errorMessage = createStatusResponseMessage(message, request->clientID);
+            message_t errorMessage = createStatusResponseMessage(message, request->clientID);
 
-    //         if (&errorMessage != NULL)
-    //         {
-    //             response_t response = createServerErrorResponse(&errorMessage);
-    //             sendResponse(response, new_fd);
-    //         }
-    //         return 0;
-    //     }
-    //     else
-    //     {
-    //         channel = getChannel(request->channelID);
+            if (&errorMessage != NULL)
+            {
+                response_t response = createServerErrorResponse(&errorMessage);
+                sendResponse(response, new_fd);
+            }
+            return 0;
+        }
+        else
+        {
+            channel = getChannel(request->channelID);
 
-    //         if (channel == NULL || channel->channelID != request->channelID)
-    //         { // Invalid channel id
+            if (channel == NULL || channel->channelID != request->channelID)
+            { // Invalid channel id
 
-    //             char *msg = "Invalid channel: ";
-    //             char *message_ptr = parseMessage(msg, request->channelID);
+                char *msg = "Invalid channel: ";
+                char *message_ptr = parseMessage(msg, request->channelID);
 
-    //             message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
+                message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-    //             if (&errorMessage != NULL)
-    //             {
-    //                 response_t response = createServerErrorResponse(&errorMessage);
-    //                 sendResponse(response, new_fd);
-    //             }
-    //         }
-    //         else
-    //         {
-    //             isClient = findSubscriberInChannel(channel, request->clientID);
+                if (&errorMessage != NULL)
+                {
+                    response_t response = createServerErrorResponse(&errorMessage);
+                    sendResponse(response, new_fd);
+                }
+            }
+            else
+            {
+                isClient = findSubscriberInChannel(channel, request->clientID);
 
-    //             if (isClient != NULL)
-    //             { // unsubscribe client
-    //                 unSubscribe(request->channelID, isClient->clientID);
+                if (isClient != NULL)
+                { // unsubscribe client
+                    // printf("\n isClient != NULL **\n");
+                    unSubscribe(request->channelID, isClient->clientID);
 
-    //                 print_subscribers_all();
+                    print_channels_with_subscribers();
+                    // print_subscribers_all();
 
-    //                 print_channels_with_subscribers();
+                    char *msg = "Unsubscribed from channel: ";
+                    char *message_ptr = parseMessage(msg, request->channelID);
 
-    //                 char *msg = "Unsubscribed from channel: ";
-    //                 char *message_ptr = parseMessage(msg, request->channelID);
+                    message_t successMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-    //                 message_t successMessage = createStatusResponseMessage(message_ptr, request->clientID);
+                    if (&successMessage != NULL)
+                    {
+                        response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
+                        sendResponse(response, new_fd);
+                    }
+                }
+                else
+                { // Client already subscribed
 
-    //                 if (&successMessage != NULL)
-    //                 {
-    //                     response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
-    //                     sendResponse(response, new_fd);
-    //                 }
-    //             }
-    //             else
-    //             { // Client already subscribed
+                    char *msg = "Not subscribed to channel: ";
+                    char *message_ptr = parseMessage(msg, request->channelID);
 
-    //                 char *msg = "Not subscribed to channel: ";
-    //                 char *message_ptr = parseMessage(msg, request->channelID);
+                    message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-    //                 message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
+                    if (&errorMessage != NULL)
+                    {
+                        response_t response = createServerErrorResponse(&errorMessage);
+                        sendResponse(response, new_fd);
+                    }
+                }
+            }
+        }
 
-    //                 if (&errorMessage != NULL)
-    //                 {
-    //                     response_t response = createServerErrorResponse(&errorMessage);
-    //                     sendResponse(response, new_fd);
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     return 0;
-    // }
+        return 0;
+    }
 
     // if (request->commandID == SEND)
     // { // SEND message to channel
@@ -1018,35 +1018,36 @@ char *parseMessage(char *msg, int channel_id)
     return message;
 }
 
-// int unSubscribe(int channel_id, int client_id)
-// { // Delete clinet from linked list
+int unSubscribe(int channel_id, int client_id)
+{ // Delete clinet from linked list
 
-//     channel_t *channel = getChannel(channel_id);
-//     client_t *subHead = channel->subscriberHead, *prevNode;
+    channel_t *channel = getChannel(channel_id);
 
-//     // first node is the client to delete
-//     if (subHead != NULL && subHead->clientID == client_id)
-//     {                                            // if head node is the client
-//         channel->subscriberHead = subHead->next; // subscriber head is linked to the next node
-//         free(subHead);
+    int i, j = 0;
 
-//         return 0;
-//     }
+    for (i = 0; i < MAX_CHANNELS; i++)
+    {
+        for (j = 0; j < MAX_CLIENTS; j++)
+        {
+            if (channel->subscribers[i].clientID == client_id)
+            {
+                // printf("\nunsubinggggg  client id %d\n\n", channel->subscribers[i].clientID);
+                int pos = i; // pos = index to delete
 
-//     // or Search for the node to be deleted
-//     while (subHead != NULL && subHead->clientID != client_id)
-//     { // save the previous node
-//         prevNode = subHead;
-//         subHead = subHead->next;
-//     }
+                for (i = pos - 1; i < channel->subscriberCount; i++)
+                {                                                          // i = previous element to the one being deleted
+                    channel->subscribers[i] = channel->subscribers[i + 1]; // moved to the index of the element to be deleted.
+                }
 
-//     // *Unlink the node from the linked list (found)
-//     prevNode->next = subHead->next; // and link the node previous to the one being deleted to the next node after one being deleted
+                channel->subscriberCount--; // reduce the length to show updated array
 
-//     free(subHead);
+                return 0;
+            }
+        }
+    }
 
-//     return 0;
-// }
+    return 0;
+}
 
 channel_t *getChannel(int channelID)
 {
