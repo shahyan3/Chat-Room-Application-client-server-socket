@@ -1,22 +1,41 @@
-# Makefile for fibfork
+# # Makefile for fibfork
 
-CC = gcc
+# CC = gcc
 
-CFLAGS = -Wall
+# CFLAGS = -Wall
 
-all: server
-	echo "Done."
+# all: server
+# 	echo "Done."
 
-server1.o: server_functions.h 
+# server1.o: server_functions.h 
 
 
-server: server1.o
+# server: server1.o
  
  
-# fibfork: fibfork.o fib.o
+# # fibfork: fibfork.o fib.o
+
+# clean:
+# 	rm -f server
+# 	rm -f *.o
+
+# .PHONY: all clean 
+
+
+
+TARGET=client server  
+
+CC=gcc
+
+CFLAGS= -Wall -Wextra -g -I.
+
+normal: $(TARGET)
+
+server: server1.c
+	$(CC) $(CFLAGS) server1.c -o server
+
+client: client1.c
+	$(CC) $(CFLAGS) client1.c -o client
 
 clean:
-	rm -f server
-	rm -f *.o
-
-.PHONY: all clean 
+	$(RM) $(TARGET)

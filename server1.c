@@ -138,9 +138,6 @@ int main(int argc, char *argv[])
         sharedChannels->hostedChannels[i].messagesCount = 0;
         sharedChannels->hostedChannels[i].messagesCount = 0;
         sharedChannels->hostedChannels[i].subscriberCount = 0;
-
-        // sharedChannels->hostedChannels[i].subscribers = (client_t *)malloc(sizeof(client_t) * MAX_CLIENTS);
-        // sharedChannels->hostedChannels[i].messages = (message_t *)malloc(sizeof(message_t) * MAX_MESSAGE_COUNT);
     }
 
     /* Get port number for server to listen on */
@@ -203,26 +200,10 @@ int main(int argc, char *argv[])
         printf("server: got connection from %s\n",
                inet_ntoa(their_addr.sin_addr));
 
-        // for (i = 0; i < 5; i++)
-        // {
-        //     printf("\nParent process: channels id %d\n", sharedChannels->hostedChannels[i].channelID);
-        // }
-
         if (!fork())
         { /* this is the child process */
             printf("\n-----------------------CHILD START ----------\n");
             printf("\n child process id is %d. parent id is: %d\n", getpid(), getppid());
-
-            // /*
-            // * Locate the segment.
-            // */
-            // key_t key = 1234;
-
-            // if ((shmid = shmget(key, SHMSZ, 0666)) < 0)
-            // {
-            //     perror("shmget");
-            //     exit(1);
-            // }
 
             /*
             * Now we attach the segment to our data space.
@@ -232,11 +213,6 @@ int main(int argc, char *argv[])
                 perror("shmat");
                 exit(1);
             }
-
-            // for (i = 0; i < 5; i++)
-            // {
-            //     printf("\nchild process: channels id %d\n", sharedChannels->hostedChannels[i].channelID);
-            // }
 
             /* ***Server-Client Connected*** */
             int child_id = getpid();
@@ -308,7 +284,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
             message_t errorMessage = createStatusResponseMessage(message, request->clientID);
 
-            if (&errorMessage != NULL)
+            if (&errorMessage.messageID != NULL)
             {
                 response_t response = createServerErrorResponse(&errorMessage);
                 sendResponse(response, new_fd);
@@ -328,7 +304,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                 message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                if (&errorMessage != NULL)
+                if (&errorMessage.messageID != NULL)
                 {
                     response_t response = createServerErrorResponse(&errorMessage);
                     sendResponse(response, new_fd);
@@ -359,7 +335,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     message_t successMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                    if (&successMessage != NULL)
+                    if (&successMessage.messageID != NULL)
                     {
                         response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
                         sendResponse(response, new_fd);
@@ -374,7 +350,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                    if (&errorMessage != NULL)
+                    if (&errorMessage.messageID != NULL)
                     {
                         response_t response = createServerErrorResponse(&errorMessage);
                         sendResponse(response, new_fd);
@@ -400,7 +376,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
             message_t errorMessage = createStatusResponseMessage(message, request->clientID);
 
-            if (&errorMessage != NULL)
+            if (&errorMessage.messageID != NULL)
             {
                 response_t response = createServerErrorResponse(&errorMessage);
                 sendResponse(response, new_fd);
@@ -419,7 +395,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                 message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                if (&errorMessage != NULL)
+                if (&errorMessage.messageID != NULL)
                 {
                     response_t response = createServerErrorResponse(&errorMessage);
                     sendResponse(response, new_fd);
@@ -442,7 +418,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     message_t successMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                    if (&successMessage != NULL)
+                    if (&successMessage.messageID != NULL)
                     {
                         response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
                         sendResponse(response, new_fd);
@@ -456,7 +432,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                    if (&errorMessage != NULL)
+                    if (&errorMessage.messageID != NULL)
                     {
                         response_t response = createServerErrorResponse(&errorMessage);
                         sendResponse(response, new_fd);
@@ -471,7 +447,7 @@ int handleClientRequests(request_t *request, client_t *client)
     if (request->commandID == SEND)
     { // SEND message to channel
         printf("$Command id %d and channel id %d\n", request->commandID, request->channelID);
-        int i;
+        // int i;
         channel_t *channel;
 
         channel = getChannel(request->channelID);
@@ -487,7 +463,7 @@ int handleClientRequests(request_t *request, client_t *client)
             char *message = "Message successfully sent";
             message_t successMessage = createStatusResponseMessage(message, request->clientID);
 
-            if (&successMessage != NULL)
+            if (&successMessage.messageID != NULL)
             {
                 response_t response = createServerErrorResponse(&successMessage);
                 sendResponse(response, new_fd);
@@ -502,7 +478,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
             message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-            if (&errorMessage != NULL)
+            if (&errorMessage.messageID != NULL)
             {
                 response_t response = createServerErrorResponse(&errorMessage);
                 sendResponse(response, new_fd);
@@ -534,7 +510,7 @@ int handleClientRequests(request_t *request, client_t *client)
                 {
                     message_t unreadMessage = readNextMsgFromChannel(channel, client);
 
-                    if (&unreadMessage != NULL)
+                    if (&unreadMessage.messageID != NULL)
                     { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                         // create server response to client WITH MESSAGE
@@ -566,7 +542,7 @@ int handleClientRequests(request_t *request, client_t *client)
                     // // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
                     message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
 
-                    if (&noMsgErrorMessage != NULL)
+                    if (&noMsgErrorMessage.messageID != NULL)
                     {
                         response_t response = createServerErrorResponse(&noMsgErrorMessage);
                         sendResponse(response, new_fd);
@@ -581,7 +557,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                 message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-                if (&errorMessage != NULL)
+                if (&errorMessage.messageID != NULL)
                 {
                     response_t response = createServerErrorResponse(&errorMessage);
                     sendResponse(response, new_fd);
@@ -596,7 +572,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
             message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-            if (&errorMessage != NULL)
+            if (&errorMessage.messageID != NULL)
             {
                 response_t response = createServerErrorResponse(&errorMessage);
                 sendResponse(response, new_fd);
@@ -627,7 +603,7 @@ int handleClientRequests(request_t *request, client_t *client)
             // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
             message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
 
-            if (&noMsgErrorMessage != NULL)
+            if (&noMsgErrorMessage.messageID != NULL)
             {
                 response_t response = createServerErrorResponse(&noMsgErrorMessage);
                 sendResponse(response, new_fd);
@@ -646,7 +622,7 @@ int handleClientRequests(request_t *request, client_t *client)
             // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
             message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
 
-            if (&noMsgErrorMessage != NULL)
+            if (&noMsgErrorMessage.messageID != NULL)
             {
                 response_t response = createServerErrorResponse(&noMsgErrorMessage);
                 sendResponse(response, new_fd);
@@ -673,7 +649,7 @@ int handleClientRequests(request_t *request, client_t *client)
                             // printf("\n ------------> YES client->unReadMsg %d\n", client->unReadMsg);
                             message_t unreadMessage = readNextMsgFromChannel(channel, client);
 
-                            if (&unreadMessage != NULL)
+                            if (&unreadMessage.messageID != NULL)
                             { // NOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                                 // create server response to client WITH MESSAGE
@@ -821,26 +797,6 @@ int parseRequest(int new_fd, char *clientRequest, char *user_command, char *chan
     return 0;
 }
 
-// channel_t *generateHostChannels()
-// {
-//     int i, j = 0;
-
-//     channel_t hostedChannels[MAX_CHANNELS];
-
-//     for (i = 0; i < MAX_CHANNELS; i++)
-//     {
-
-//         hostedChannels[i].channelID = i;
-//         hostedChannels[i].totalMsg = 0;
-//         hostedChannels[i].messagesCount = 0;
-//         hostedChannels[i].subscriberCount = 0;
-
-//         hostedChannels[i].subscribers = (client_t *)malloc(sizeof(client_t) * MAX_CLIENTS);
-//         hostedChannels[i].messages = (message_t *)malloc(sizeof(message_t) * MAX_MESSAGE_COUNT);
-//     }
-
-//     return hostedChannels;
-// }
 client_t generate_client(int child_id)
 {
     client_t *client = malloc(sizeof(client_t));
@@ -895,7 +851,6 @@ int randomClientIdGenerator()
 int subscriberCountInChannel(channel_t *channel)
 {
     int subscriberCount = 0;
-    int i, j = 0;
 
     subscriberCount = sizeof(channel->subscribers) / sizeof(client_t);
 
@@ -1143,51 +1098,7 @@ client_t *findSubscriberInChannel(channel_t *channel, int clientID)
     }
 
     return client;
-
-    // client_t *client = NULL;
-
-    // client_t *subHead = channel->subscriberHead;
-
-    // if (subHead == NULL)
-    // {
-    //     // printf("\n **no subscriber in the list\n");
-    //     return subHead;
-    // }
-    // else
-    // {
-    //     while (subHead != NULL)
-    //     {
-    //         if (subHead->clientID == clientID)
-    //         {
-    //             client = subHead;
-    //             break;
-    //         }
-    //         subHead = subHead->next;
-    //     }
-    //     return subHead;
-    // }
 }
-
-// message_t *findLastMsgInLinkedList(channel_t channel)
-// {
-
-//     message_t *lastMsgInList = NULL;
-//     message_t *msgHead = channel.messageHead;
-
-//     if (channel.messageHead == NULL)
-//     {
-//         // no messages in linkedlist
-//         lastMsgInList = NULL;
-//     }
-
-//     while (msgHead != NULL)
-//     {
-//         lastMsgInList = msgHead;
-//         msgHead = msgHead->next;
-//     }
-
-//     return lastMsgInList;
-// }
 
 void subscribe(client_t *client_, int channel_id)
 {
@@ -1236,7 +1147,6 @@ void writeToChannelReq(request_t *request, channel_t *channel)
 { // critical section **&^%$%^&&^%
 
     int i, j = 0;
-    int count = 0;
 
     message_t *client_message = malloc(sizeof(message_t));
     *client_message = request->message;
@@ -1296,9 +1206,6 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
 {
     int i, j, k = 0;
 
-    // printf("\n =====>: clientt unReads %d\n", client->unReadMsg);
-    // printf("\n =====>: channel id %d\n", channel->channelID);
-
     message_t unreadMessage;
     int clientsNextMessageToReadIndex = client->messageQueueIndex + 1;
 
@@ -1339,6 +1246,19 @@ message_t readNextMsgFromChannel(channel_t *channel, client_t *client)
     // printf("\n 2.Next msg: %s\n", unreadMessage.content);
 
     return unreadMessage;
+}
+
+message_t createStatusResponseMessage(char *message, int clientID)
+{
+
+    message_t statusMessage;
+
+    statusMessage.messageID = 1;
+    statusMessage.ownerID = clientID;
+
+    strcpy(statusMessage.content, message);
+
+    return statusMessage;
 }
 
 // // NEXT: returns unread message from all channels one by one
@@ -1410,16 +1330,3 @@ message_t readNextMsgFromChannel(channel_t *channel, client_t *client)
 
 //     // return totalUnreadMsg;
 // }
-
-message_t createStatusResponseMessage(char *message, int clientID)
-{
-
-    message_t statusMessage;
-
-    statusMessage.messageID = 1;
-    statusMessage.ownerID = clientID;
-
-    strcpy(statusMessage.content, message);
-
-    return statusMessage;
-}
