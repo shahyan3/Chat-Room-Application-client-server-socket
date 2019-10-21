@@ -51,7 +51,6 @@ typedef struct channel channel_t;
 struct channel
 {
     int channelID;
-    int totalMsg;
     message_t messages[MAX_MESSAGE_COUNT];
     client_t subscribers[MAX_CLIENTS];
     int subscriberCount;

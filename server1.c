@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
     {
 
         sharedChannels->hostedChannels[i].channelID = i;
-        sharedChannels->hostedChannels[i].totalMsg = 0;
+        sharedChannels->hostedChannels[i].messagesCount = 0;
         sharedChannels->hostedChannels[i].messagesCount = 0;
         sharedChannels->hostedChannels[i].subscriberCount = 0;
 
@@ -1210,8 +1210,8 @@ void subscribe(client_t *client_, int channel_id)
             int subscriberCount = sharedChannels->hostedChannels[i].subscriberCount;
 
             // update the client message queue to current message count in channel
-            client->entryIndexConstant = sharedChannels->hostedChannels[i].totalMsg;
-            client->messageQueueIndex = sharedChannels->hostedChannels[i].totalMsg;
+            client->entryIndexConstant = sharedChannels->hostedChannels[i].messagesCount;
+            client->messageQueueIndex = sharedChannels->hostedChannels[i].messagesCount;
 
             // update client status to active
             client->status = CLIENT_ACTIVE;
@@ -1219,10 +1219,15 @@ void subscribe(client_t *client_, int channel_id)
             // add client to the next free index
             sharedChannels->hostedChannels[i].subscribers[subscriberCount] = *client;
 
+            printf("### Subscriber Count:: %d\n", sharedChannels->hostedChannels[i].subscriberCount);
+            printf("### Subscriber ID: %d\n", sharedChannels->hostedChannels[i].subscribers[subscriberCount].clientID);
+
+            printf("### Subscriber entryIndexConstant: %d\n", sharedChannels->hostedChannels[i].subscribers[subscriberCount].entryIndexConstant);
+            printf("### CHANNEL messageCount: %d\n", sharedChannels->hostedChannels[i].messagesCount);
+            printf("### Subscriber messageQueueIndex: %d\n", sharedChannels->hostedChannels[i].subscribers[subscriberCount].messageQueueIndex);
+
             // update channels subscriber count
             sharedChannels->hostedChannels[i].subscriberCount += 1;
-
-            printf("### Subscriber Count:: %d", sharedChannels->hostedChannels[i].subscriberCount);
         }
     }
 }
