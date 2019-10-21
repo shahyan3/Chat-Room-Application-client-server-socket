@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "server_functions.h": "c",
+        "stdlib.h": "c"
+    }
+}

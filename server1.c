@@ -20,19 +20,27 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#include "server_functions.h"
+
+#define SHMSZ 27
+
 #define ARRAY_SIZE 30 /* Size of array to receive */
 
 #define BACKLOG 10 /* how many pending connections queue will hold */
 
 #define RETURNED_ERROR -1
 
-#define MAX_CLIENTS 100
+// #define MAX_CLIENTS 100
 
-#define MAX_MESSAGE_COUNT 1000
+// #define MAX_MESSAGE_COUNT 1000
 
 #define MAX_CHANNELS 256
 
-#define MAX_MESSAGE_LENGTH 1024
+// #define MAX_MESSAGE_LENGTH 1024
 
 #define NO_CHANNEL -1
 
@@ -53,130 +61,24 @@
 #define CLIENT_ACTIVE -1
 #define CLIENT_INACTIVE -2
 
+#define SIZEOFMEMORY 27
+
 int sockfd;
 int new_fd; /* listen on sock_fd, new connection on new_fd */
 
-typedef struct message message_t;
-
-struct message
-{
-    int messageID;
-    int ownerID;
-    char content[MAX_MESSAGE_LENGTH];
-    // message_t *next;
-};
-
-message_t client_message;
-
-typedef struct request request_t;
-
-struct request
-{
-    int commandID; /* integer enum representing command i.e. SUB, NEXT*/
-    int channelID;
-    int clientID;
-    message_t message;
-    int liveFeed;
-};
-
-request_t clientRequest; /* move into main ??*/
-
-typedef struct client client_t;
-
-struct client
-{
-    int clientID;
-    int readMsg;
-    int unReadMsg;
-    int totalMessageSent;
-    int messageQueueIndex;  /* index = message that it read currently, NOT NEXT ONE */
-    int entryIndexConstant; /* index of msg queue at which the client subed */
-    int status;
-    // client_t *next;
-};
-
-typedef struct channel channel_t;
-
-struct channel
-{
-    int channelID;
-    int totalMsg;
-    message_t *messages;
-    client_t *subscribers;
-    int subscriberCount;
-    int messagesCount;
-};
-
-typedef struct response response_t;
-
-struct response
-{
-    int clientID;
-    message_t message;
-    int error;
-    int channel_id;
-    int unReadMessagesCount;
-};
-
-// Creates 256 channels for global hostedChannels array
-channel_t *generateHostChannels();
-
-channel_t *hostedChannels = NULL;
-
 /*
-    CHANNEL FUNCTIONS (INCLUDE IN SEPERATE FILE LATER)
+*   SHARED MEMORY 
 */
 
-client_t generate_client(); // cretes inactive client objects to the channels
-int randomClientIdGenerator();
+struct shared
+{
+    channel_t hostedChannels[MAX_CHANNELS];
+} typedef sharedMemory_t;
 
-void print_channels_with_subscribers();
+sharedMemory_t *sharedChannels;
 
-// when subscribing to channel, finds out the last message in the channel, and will be used to add the message id to the subscribing client
-message_t createStatusResponseMessage(char *message, int clientID);
-response_t createServerErrorResponse(message_t *message);
-
-// // SUBSCRIBE AND UNSUBSCRIBE FUNCS
-// message_t *findLastMsgInLinkedList(channel_t channel);
-
-void subscribe(client_t *client_, int channel_id);
-
-int unSubscribe(int channel_id, int client_id);
-
-char *parseMessage(char *msg, int channel_id);
-
-client_t *findSubscriberInChannel(channel_t *channel, int clientID);
-
-int subscriberCountInChannel(channel_t *channel);
-
-void print_subscribers_all();
-
-void updateUnreadMsgCountForSubscribers(channel_t *channel);
-
-void writeToChannelReq(request_t *request, channel_t *channel);
-
-void print_channel_messages();
-
-message_t searchNextMsgInList(channel_t *channel, client_t *client);
-
-message_t readNextMsgFromChannel(channel_t *channel, client_t *client);
-
-int isClientSubscribedToAnyChannel(int client_id);
-
-int getNextNthMessageCount(int client_id);
-
-response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount);
-int sendResponse(response_t serverResponse, int sock_id);
-
-// message_t readNextMsgFromAllChannel(int clientID); // next no id
-
-channel_t *getChannel(int channelID);
-
-// int nextMessageCountInChannels(int clientID);
-
-/*
-    END OF
-*/
+int shmid;
+key_t key;
 
 void shut_down_handler()
 {
@@ -194,10 +96,6 @@ void shut_down_handler()
     exit(1);
 }
 
-int handleClientRequests(request_t *request, client_t *client);
-
-// int parseRequest(int new_fd, char *clientRequest, char *user_command, char *channel_id);
-
 int main(int argc, char *argv[])
 {
     int port = 12345;
@@ -212,10 +110,43 @@ int main(int argc, char *argv[])
     socklen_t sin_size;
     int i = 0;
 
+    /** Create Shared Memory    **/
+    key = 1234;
+
+    //  Create the segment using shmget
+    int size = (sizeof(sharedMemory_t));
+    if ((shmid = shmget(key, size, IPC_CREAT | 0666)) < 0) /* if return value is less 0, error*/
+    {
+        perror("shmget");
+        exit(1);
+    }
+
+    /*
+        * Now we attach the segment to our data space. For each process??????
+        */
+    if ((sharedChannels = shmat(shmid, NULL, 0)) == (sharedMemory_t *)-1)
+    {
+        perror("shmat");
+        exit(1);
+    }
+
+    // GENEATE CHANNELS IN SHARED MEMORY
+    for (i = 0; i < MAX_CHANNELS; i++)
+    {
+
+        sharedChannels->hostedChannels[i].channelID = i;
+        sharedChannels->hostedChannels[i].totalMsg = 0;
+        sharedChannels->hostedChannels[i].messagesCount = 0;
+        sharedChannels->hostedChannels[i].subscriberCount = 0;
+
+        // sharedChannels->hostedChannels[i].subscribers = (client_t *)malloc(sizeof(client_t) * MAX_CLIENTS);
+        // sharedChannels->hostedChannels[i].messages = (message_t *)malloc(sizeof(message_t) * MAX_MESSAGE_COUNT);
+    }
+
     /* Get port number for server to listen on */
     if (argc == 2)
     {
-        // fprintf(stderr, "usage: client port_number\n");
+        fprintf(stderr, "usage: client port_number\n");
         // exit(1);
         port = atoi(argv[1]);
     }
@@ -253,33 +184,74 @@ int main(int argc, char *argv[])
 
     printf("server starts listening on %d...\n", port);
 
+    printf("\n-------------------------------------------\n");
+
     /* repeat: accept, send, close the connection */
-    sin_size = sizeof(struct sockaddr_in);
-    while (new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size))
+    while (1)
     {
+
+        sin_size = sizeof(struct sockaddr_in);
+        new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+
+        if (new_fd == -1)
+        {
+            perror("accept.");
+            printf("\n...error: accept new_fd failed\n");
+            // continue;
+        }
+
         printf("server: got connection from %s\n",
                inet_ntoa(their_addr.sin_addr));
 
-        /* ***Server-Client Connected*** */
+        // for (i = 0; i < 5; i++)
+        // {
+        //     printf("\nParent process: channels id %d\n", sharedChannels->hostedChannels[i].channelID);
+        // }
 
-        printf("\n-------------------------------------------\n");
+        if (!fork())
+        { /* this is the child process */
+            printf("\n-----------------------CHILD START ----------\n");
+            printf("\n child process id is %d. parent id is: %d\n", getpid(), getppid());
 
-        // FORK
-        hostedChannels = generateHostChannels();
+            // /*
+            // * Locate the segment.
+            // */
+            // key_t key = 1234;
 
-        client_t client = generate_client();
+            // if ((shmid = shmget(key, SHMSZ, 0666)) < 0)
+            // {
+            //     perror("shmget");
+            //     exit(1);
+            // }
 
-        printf("\n =>client id %d STATUS: %d\n", client.clientID, client.status);
+            /*
+            * Now we attach the segment to our data space.
+            */
+            if ((sharedChannels = shmat(shmid, NULL, 0)) == (sharedMemory_t *)-1)
+            {
+                perror("shmat");
+                exit(1);
+            }
 
-        // ADD a new client objec
-        if (client.clientID < -1)
-        {
-            perror("SERVER: failed to create client object (Max. 100 clients allowed)");
-            printf("SERVER: failed to create client object (Max. 100 clients allowed) \n");
-            // send response to client Cant accept connection
-        }
-        else
-        {
+            // for (i = 0; i < 5; i++)
+            // {
+            //     printf("\nchild process: channels id %d\n", sharedChannels->hostedChannels[i].channelID);
+            // }
+
+            /* ***Server-Client Connected*** */
+            int child_id = getpid();
+            client_t client = generate_client(child_id);
+
+            printf("\n =>client id %d STATUS: %d\n", client.clientID, client.status);
+
+            // ADD a new client objec
+            if (client.clientID < -1)
+            {
+                perror("SERVER: failed to create client object (Max. 100 clients allowed)");
+                printf("SERVER: failed to create client object (Max. 100 clients allowed) \n");
+                exit(1);
+                // send response to client Cant accept connection
+            }
 
             printf("\n-------------------------------------------\n");
 
@@ -309,6 +281,10 @@ int main(int argc, char *argv[])
                     printf("\n***********************************************\n");
                 }
             }
+
+            printf("\n-----------------------CHILD END ----------\n");
+            close(new_fd);
+            exit(1);
         }
     }
 }
@@ -356,7 +332,7 @@ int handleClientRequests(request_t *request, client_t *client)
                 {
                     response_t response = createServerErrorResponse(&errorMessage);
                     sendResponse(response, new_fd);
-                    printf("message %s\n", errorMessage.content);
+                    printf("--->-->message %s\n", errorMessage.content);
                 }
             }
             else
@@ -376,7 +352,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     print_channels_with_subscribers();
 
-                    // print_subscribers_all();
+                    print_subscribers_all();
 
                     char *msg = "Subscribed to channel: ";
                     char *message_ptr = parseMessage(msg, request->channelID);
@@ -734,92 +710,94 @@ int handleClientRequests(request_t *request, client_t *client)
         return 0;
     }
 
-    // if (request->commandID == LIVEFEED_ID && request->liveFeed == LIVEFEED_TRUE)
-    // { // LIVEFEED with id
-    //     printf("Server: livefeed got channel id %d", request->channelID);
+    if (request->commandID == LIVEFEED_ID && request->liveFeed == LIVEFEED_TRUE)
+    { // LIVEFEED with id
+        printf("Server: livefeed got channel id %d", request->channelID);
 
-    //     int count = 0;
-    //     channel_t *channel;
+        // int count = 0;
+        // channel_t *channel;
 
-    //     int totalUnreadMessageCount = 0;
+        // int totalUnreadMessageCount = 0;
 
-    //     int notSubscribed = isClientSubscribedToAnyChannel(request->clientID); // TODO TMRW
+        // int notSubscribed = isClientSubscribedToAnyChannel(request->clientID); // TODO TMRW
 
-    //     if (notSubscribed == 1)
-    //     { // client not subscribed to any channel
+        // if (notSubscribed == 1)
+        // { // client not subscribed to any channel
 
-    //         char *message = "Not subscribed to any channels.";
+        //     char *message = "Not subscribed to any channels.";
 
-    //         // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
-    //         message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
+        //     // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+        //     message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
 
-    //         if (&noMsgErrorMessage != NULL)
-    //         {
-    //             response_t response = createServerErrorResponse(&noMsgErrorMessage);
-    //             sendResponse(response, new_fd);
-    //             printf("\nerror response send \n");
-    //         }
+        //     if (&noMsgErrorMessage != NULL)
+        //     {
+        //         response_t response = createServerErrorResponse(&noMsgErrorMessage);
+        //         sendResponse(response, new_fd);
+        //         printf("\nerror response send \n");
+        //     }
 
-    //         return 0;
-    //     }
-    //     else
-    //     {
-    //         // // returns an integer that is the total number of next Unread Message in all channels for given client
-    //         // totalUnreadMessageCount = getNextNthMessageCount(request->clientID);
-    //         // printf("\n  1) total unread: %d \n", totalUnreadMessageCount);
+        //     return 0;
+        // }
+        // else
+        // {
+        //     // // returns an integer that is the total number of next Unread Message in all channels for given client
+        //     // totalUnreadMessageCount = getNextNthMessageCount(request->clientID);
+        //     // printf("\n  1) total unread: %d \n", totalUnreadMessageCount);
 
-    //         // while() {
+        //     // while() {
 
-    //         // }
-    //         // Client subscribed to at least one channel at this point.
-    //         while (count <= MAX_CHANNELS)
-    //         {
-    //             channel = getChannel(count); // find the channel given channel id
+        //     // }
+        //     // Client subscribed to at least one channel at this point.
+        //     while (count <= MAX_CHANNELS)
+        //     {
+        //         channel = getChannel(count); // find the channel given channel id
 
-    //             if (channel != NULL)
-    //             {
-    //                 client_t *client = findSubscriberInChannel(channel, request->clientID);
+        //         if (channel != NULL)
+        //         {
+        //             client_t *client = findSubscriberInChannel(channel, request->clientID);
 
-    //                 if (client != NULL)
-    //                 {
-    //                     if (client->unReadMsg >= 1 && totalUnreadMessageCount != 0)
-    //                     {
-    //                         // printf("\n ------------> YES client->unReadMsg %d\n", client->unReadMsg);
-    //                         message_t unreadMessage = readNextMsgFromChannel(channel, client);
+        //             if (client != NULL)
+        //             {
+        //                 if (client->unReadMsg >= 1 && totalUnreadMessageCount != 0)
+        //                 {
+        //                     // printf("\n ------------> YES client->unReadMsg %d\n", client->unReadMsg);
+        //                     message_t unreadMessage = readNextMsgFromChannel(channel, client);
 
-    //                         if (&unreadMessage != NULL)
-    //                         { // NOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
+        //                     if (&unreadMessage != NULL)
+        //                     { // NOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
-    //                             // create server response to client WITH MESSAGE
-    //                             response_t response = createServerResponse(&unreadMessage, client, channel->channelID, totalUnreadMessageCount);
+        //                         // create server response to client WITH MESSAGE
+        //                         response_t response = createServerResponse(&unreadMessage, client, channel->channelID, totalUnreadMessageCount);
 
-    //                             if (response.error == 0)
-    //                             {
-    //                                 printf("\n________________________ \n");
-    //                                 printf("NEXT %d Message Sending...|\n", request->channelID);
-    //                                 printf("__________________________ \n");
+        //                         if (response.error == 0)
+        //                         {
+        //                             printf("\n________________________ \n");
+        //                             printf("NEXT %d Message Sending...|\n", request->channelID);
+        //                             printf("__________________________ \n");
 
-    //                                 printf("\nClientID: %d\n", response.clientID);
-    //                                 printf("Next message : %s\n", response.message.content);
-    //                                 printf("UnReadMessageCOUNT : %d\n", response.unReadMessagesCount);
-    //                                 printf("Error status : %d\n", response.error);
-    //                                 printf("\n");
-    //                             }
+        //                             printf("\nClientID: %d\n", response.clientID);
+        //                             printf("Next message : %s\n", response.message.content);
+        //                             printf("UnReadMessageCOUNT : %d\n", response.unReadMessagesCount);
+        //                             printf("Error status : %d\n", response.error);
+        //                             printf("\n");
+        //                         }
 
-    //                             // send response to client
-    //                             sendResponse(response, new_fd);
-    //                             sleep(1);
+        //                         // send response to client
+        //                         sendResponse(response, new_fd);
+        //                         sleep(1);
 
-    //                             totalUnreadMessageCount--; // decrement the total count of next Unread messages client server needs to wait for
-    //                             // printf("\n DECREMENT number UNREAD COUNT %d <-- \n", totalUnreadMessageCount);
-    //                         }
-    //                     }
-    //                 }
-    //             }
+        //                         totalUnreadMessageCount--; // decrement the total count of next Unread messages client server needs to wait for
+        //                         // printf("\n DECREMENT number UNREAD COUNT %d <-- \n", totalUnreadMessageCount);
+        //                     }
+        //                 }
+        //             }
+        //         }
 
-    //             count++; // increment to next channel id
-    //         }
-    //     }
+        //         count++; // increment to next channel id
+        //     }
+        // }
+        return 0;
+    }
 
     return 0;
 }
@@ -843,31 +821,32 @@ int parseRequest(int new_fd, char *clientRequest, char *user_command, char *chan
     return 0;
 }
 
-channel_t *generateHostChannels()
-{
-    int i, j = 0;
+// channel_t *generateHostChannels()
+// {
+//     int i, j = 0;
 
-    channel_t *hostedChannels = malloc(sizeof(channel_t) * MAX_CHANNELS);
+//     channel_t hostedChannels[MAX_CHANNELS];
 
-    for (i = 0; i < MAX_CHANNELS; i++)
-    {
+//     for (i = 0; i < MAX_CHANNELS; i++)
+//     {
 
-        hostedChannels[i].channelID = i;
-        hostedChannels[i].totalMsg = 0;
-        hostedChannels[i].messagesCount = 0;
-        hostedChannels[i].subscriberCount = 0;
+//         hostedChannels[i].channelID = i;
+//         hostedChannels[i].totalMsg = 0;
+//         hostedChannels[i].messagesCount = 0;
+//         hostedChannels[i].subscriberCount = 0;
 
-        hostedChannels[i].subscribers = (client_t *)malloc(sizeof(client_t) * MAX_CLIENTS);
-        hostedChannels[i].messages = (message_t *)malloc(sizeof(message_t) * MAX_MESSAGE_COUNT);
-    }
+//         hostedChannels[i].subscribers = (client_t *)malloc(sizeof(client_t) * MAX_CLIENTS);
+//         hostedChannels[i].messages = (message_t *)malloc(sizeof(message_t) * MAX_MESSAGE_COUNT);
+//     }
 
-    return hostedChannels;
-}
-client_t generate_client()
+//     return hostedChannels;
+// }
+client_t generate_client(int child_id)
 {
     client_t *client = malloc(sizeof(client_t));
 
-    client->clientID = randomClientIdGenerator();
+    // client->clientID = randomClientIdGenerator();
+    client->clientID = child_id;
     client->entryIndexConstant = 0;
     client->messageQueueIndex = 0;
     client->readMsg = 0;
@@ -888,18 +867,19 @@ void print_channels_with_subscribers()
     {
         for (j = 0; j < MAX_CLIENTS; j++)
         {
-            if (hostedChannels[i].subscribers[j].status == CLIENT_ACTIVE)
+            if (sharedChannels->hostedChannels[i].subscribers[j].status == CLIENT_ACTIVE)
             {
-                printf("\n\nChannel id %d\n", hostedChannels[i].channelID);
-                printf("Client id: %d\n", hostedChannels[i].subscribers[j].clientID);
-                printf("subscriber status: %d\n", hostedChannels[i].subscribers[j].status);
-                printf("subscriber count: %d\n", hostedChannels[i].subscriberCount);
+                printf("\n\nChannel id %d\n", sharedChannels->hostedChannels[i].channelID);
+                printf("\nChannel SUB count %d\n", sharedChannels->hostedChannels[i].subscriberCount);
+                printf("Client id: %d\n", sharedChannels->hostedChannels[i].subscribers[j].clientID);
+                // printf("subscriber status: %d\n", sharedChannels->hostedChannels[i].subscribers[j].status);
+                printf("subscriber count: %d\n", sharedChannels->hostedChannels[i].subscriberCount);
 
-                printf("\n \t\t =>  entryIndexConstant %d\n", hostedChannels[i].subscribers[j].entryIndexConstant);
-                printf("\n \t\t =>  messageQueueIndex %d\n", hostedChannels[i].subscribers[j].messageQueueIndex);
-                printf("\n \t\t =>  readMsg %d\n", hostedChannels[i].subscribers[j].readMsg);
-                printf("\n \t\t =>  unReadMsg %d\n", hostedChannels[i].subscribers[j].unReadMsg);
-                printf("\n \t\t =>  totalMessageSent %d", hostedChannels[i].subscribers[j].totalMessageSent);
+                printf("\n \t\t =>  entryIndexConstant %d\n", sharedChannels->hostedChannels[i].subscribers[j].entryIndexConstant);
+                printf("\n \t\t =>  messageQueueIndex %d\n", sharedChannels->hostedChannels[i].subscribers[j].messageQueueIndex);
+                printf("\n \t\t =>  readMsg %d\n", sharedChannels->hostedChannels[i].subscribers[j].readMsg);
+                printf("\n \t\t =>  unReadMsg %d\n", sharedChannels->hostedChannels[i].subscribers[j].unReadMsg);
+                printf("\n \t\t =>  totalMessageSent %d", sharedChannels->hostedChannels[i].subscribers[j].totalMessageSent);
             }
         }
     }
@@ -1037,9 +1017,9 @@ channel_t *getChannel(int channelID)
 
     for (i = 0; i < MAX_CHANNELS; i++)
     {
-        if (hostedChannels[i].channelID == channelID)
+        if (sharedChannels->hostedChannels[i].channelID == channelID)
         {
-            channel = &hostedChannels[i];
+            channel = &sharedChannels->hostedChannels[i];
         }
     }
 
@@ -1104,23 +1084,26 @@ response_t createServerResponse(message_t *message, client_t *client, int channe
 void print_subscribers_all()
 {
     int i, j = 0;
-    channel_t *channel;
+    // channel_t *channel;
 
-    printf("==== All Subscribers =====\n");
+    printf("\n\n==== All Subscribers =====\n\n");
 
     for (i = 0; i < MAX_CHANNELS; i++)
     {
-        channel_t *channel = &hostedChannels[i];
+        // channel_t *channel = &sharedChannels->hostedChannels[i];
 
         for (j = 0; j < MAX_CLIENTS; j++)
         {
-            printf("\t Subscriber id %d \n", channel->subscribers[j].clientID);
-            printf("\t Subscriber messageQueueIndex %d \n", channel->subscribers[j].messageQueueIndex);
-            printf("\t Subscriber entryIndexConstant %d \n", channel->subscribers[j].entryIndexConstant);
-            printf("\t Subscriber readMsg %d \n", channel->subscribers[j].readMsg);
-            printf("\t Subscriber unReadMsg %d \n", channel->subscribers[j].unReadMsg);
-            printf("\t Subscriber totalMessageSent %d \n", channel->subscribers[j].totalMessageSent);
-            printf("\n -------------------------- \n");
+            if (sharedChannels->hostedChannels[i].subscribers[j].status == CLIENT_ACTIVE)
+            {
+                printf("Client id: %d\n", sharedChannels->hostedChannels[i].subscribers[j].clientID);
+
+                // printf("\t Subscriber messageQueueIndex %d \n", channel->subscribers[j].messageQueueIndex);
+                // printf("\t Subscriber entryIndexConstant %d \n", channel->subscribers[j].entryIndexConstant);
+                // printf("\t Subscriber readMsg %d \n", channel->subscribers[j].readMsg);
+                // printf("\t Subscriber unReadMsg %d \n", channel->subscribers[j].unReadMsg);
+                // printf("\t Subscriber totalMessageSent %d \n", channel->subscribers[j].totalMessageSent);
+            }
         }
     }
 
@@ -1133,11 +1116,11 @@ void updateUnreadMsgCountForSubscribers(channel_t *channel)
 
     for (i = 0; i < MAX_CHANNELS; i++)
     {
-        if (hostedChannels[i].channelID == channel->channelID)
+        if (sharedChannels->hostedChannels[i].channelID == channel->channelID)
         { // update unread count for all subscribers of the given channel
             for (j = 0; j < MAX_CLIENTS; j++)
             {
-                hostedChannels[i].subscribers[j].unReadMsg += 1;
+                sharedChannels->hostedChannels[i].subscribers[j].unReadMsg += 1;
             }
         }
     }
@@ -1217,27 +1200,29 @@ void subscribe(client_t *client_, int channel_id)
 
     for (i = 0; i < MAX_CHANNELS; i++)
     {
-        if (hostedChannels[i].channelID == channel_id)
+        if (sharedChannels->hostedChannels[i].channelID == channel_id)
         {
 
-            printf("\n\nChannel selected found: %d\n", hostedChannels[i].channelID);
+            printf("\n\nChannel selected found: %d\n", sharedChannels->hostedChannels[i].channelID);
             // channel = &hostedChannels[i];
 
             // current subscriber count in the channel
-            int subscriberCount = hostedChannels[i].subscriberCount;
+            int subscriberCount = sharedChannels->hostedChannels[i].subscriberCount;
 
             // update the client message queue to current message count in channel
-            client->entryIndexConstant = hostedChannels[i].totalMsg;
-            client->messageQueueIndex = hostedChannels[i].totalMsg;
+            client->entryIndexConstant = sharedChannels->hostedChannels[i].totalMsg;
+            client->messageQueueIndex = sharedChannels->hostedChannels[i].totalMsg;
 
             // update client status to active
             client->status = CLIENT_ACTIVE;
 
             // add client to the next free index
-            hostedChannels[i].subscribers[subscriberCount] = *client;
+            sharedChannels->hostedChannels[i].subscribers[subscriberCount] = *client;
 
             // update channels subscriber count
-            hostedChannels[i].subscriberCount += 1;
+            sharedChannels->hostedChannels[i].subscriberCount += 1;
+
+            printf("### Subscriber Count:: %d", sharedChannels->hostedChannels[i].subscriberCount);
         }
     }
 }
@@ -1255,17 +1240,17 @@ void writeToChannelReq(request_t *request, channel_t *channel)
     {
         for (j = 0; j < MAX_CLIENTS; j++)
         {
-            if (hostedChannels[i].channelID == request->channelID && hostedChannels[i].messagesCount <= MAX_MESSAGE_COUNT)
+            if (sharedChannels->hostedChannels[i].channelID == request->channelID && sharedChannels->hostedChannels[i].messagesCount <= MAX_MESSAGE_COUNT)
             {
 
                 // 1. Update Message ID: message id is equal to current total message count in channel (starting from 1)
-                client_message->messageID = hostedChannels[i].messagesCount + 1;
+                client_message->messageID = sharedChannels->hostedChannels[i].messagesCount + 1;
 
                 // 2. Add message to channel
-                hostedChannels[i].messages[hostedChannels[i].messagesCount] = *client_message;
+                sharedChannels->hostedChannels[i].messages[sharedChannels->hostedChannels[i].messagesCount] = *client_message;
 
                 // 3. update total message in channel (before adding message to ensure correct message id given)
-                hostedChannels[i].messagesCount += 1;
+                sharedChannels->hostedChannels[i].messagesCount += 1;
 
                 break;
             }
@@ -1285,17 +1270,17 @@ void print_channel_messages()
 
     for (i = 0; i < MAX_CHANNELS; i++)
     {
-        if (hostedChannels[i].messagesCount > 0)
+        if (sharedChannels->hostedChannels[i].messagesCount > 0)
         {
             for (j = 0; j < MAX_MESSAGE_COUNT; j++)
             {
-                if (hostedChannels[i].messages[j].messageID >= 1)
+                if (sharedChannels->hostedChannels[i].messages[j].messageID >= 1)
                 {
                     printf("ChannelID: %d, MessageID: %d | ClientID %d, Content: %s \n",
-                           hostedChannels[i].channelID,
-                           hostedChannels[i].messages[j].messageID,
-                           hostedChannels[i].messages[j].ownerID,
-                           hostedChannels[i].messages[j].content);
+                           sharedChannels->hostedChannels[i].channelID,
+                           sharedChannels->hostedChannels[i].messages[j].messageID,
+                           sharedChannels->hostedChannels[i].messages[j].ownerID,
+                           sharedChannels->hostedChannels[i].messages[j].content);
                 }
             }
         }
@@ -1314,23 +1299,23 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
 
     for (i = 0; i < MAX_CHANNELS; i++)
     {
-        if (hostedChannels[i].channelID == channel->channelID)
+        if (sharedChannels->hostedChannels[i].channelID == channel->channelID)
         { // if channel id match
             for (k = 0; k < MAX_CLIENTS; k++)
             {
-                if (hostedChannels[i].subscribers[k].clientID == client->clientID)
+                if (sharedChannels->hostedChannels[i].subscribers[k].clientID == client->clientID)
                 { // if client id also matches
                     for (j = 0; j < MAX_MESSAGE_COUNT; j++)
                     {
-                        if (hostedChannels[i].messages[j].messageID == clientsNextMessageToReadIndex)
+                        if (sharedChannels->hostedChannels[i].messages[j].messageID == clientsNextMessageToReadIndex)
                         { // next message in the client's unread index
 
                             // if messageID is the next in messageQueueIndex for client
-                            unreadMessage = hostedChannels[i].messages[j];
-                            hostedChannels[i].subscribers[k].messageQueueIndex += 1; // update messageQueueIndex
+                            unreadMessage = sharedChannels->hostedChannels[i].messages[j];
+                            sharedChannels->hostedChannels[i].subscribers[k].messageQueueIndex += 1; // update messageQueueIndex
 
-                            hostedChannels[i].subscribers[k].readMsg += 1;   // update read messages count
-                            hostedChannels[i].subscribers[k].unReadMsg -= 1; // update unread messages count
+                            sharedChannels->hostedChannels[i].subscribers[k].readMsg += 1;   // update read messages count
+                            sharedChannels->hostedChannels[i].subscribers[k].unReadMsg -= 1; // update unread messages count
                         }
                     }
                 }
