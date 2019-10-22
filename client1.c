@@ -41,61 +41,11 @@
 #define LIVEFEED_FALSE 1
 
 /*
-    STRUCTS
-*/
-
-// typedef struct request request_t;
-
-// typedef struct message message_t;
-
-// struct message
-// {
-//     int messageID;
-//     int ownerID;
-//     char content[MAX_MESSAGE_LENGTH];
-//     // message_t *next;
-// };
-// struct request
-// {
-//     int commandID; /* integer enum representing command i.e. SUB, NEXT*/
-//     int channelID;
-//     int clientID;
-//     message_t client_message;
-//     int liveFeed;
-// };
-
-// typedef struct response response_t;
-
-// struct response
-// {
-//     int clientID;
-//     message_t message;
-//     int error;
-//     int channel_id;
-//     int unReadMessagesCount;
-// };
-
-/*
     GLOBAL 
 */
 
-int msgSentCount = 0;
+// int msgSentCount = 0;
 response_t serverResponse;
-
-/*
-    FUNCTIONS
-*/
-// void display_options();
-
-// void display_menu();
-
-// int sendRequest(request_t clientRequest, int sock_id);
-
-// request_t createRequest(int command, int channel_id, int clientID, message_t *message, int liveFeedFlag);
-
-// int connection_success(int sock_id);
-
-// int parseUserMessage(message_t *client_message, char *user_msg_ptr, int clientID);
 
 int main(int argc, char *argv[])
 {
@@ -303,7 +253,6 @@ int main(int argc, char *argv[])
 
                             if (serverResponse.unReadMessagesCount == 1)
                             { // Last unreadCount displayed, break the recieving steam loop
-                                printf("\nONEEEEEEEEEEEEEEEE\n");
                                 break;
                             }
                         }
@@ -349,52 +298,60 @@ int main(int argc, char *argv[])
 
             printf("\n => Type Command: ");
         }
+        // Livefeed with id
+        else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0)
+        { // User enters LIVEFEED only
+            // printf("\n CLIENT: LIVE FEED with ID... %s  \n", command_input);
 
-        // TOD: BUG = LIVEFEED 0, LIVEFEED1 Make this true. Fix: Trim the input? regex?
-        // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0)
-        // { // User enters LIVEFEED only
-        //     printf("\n CLIENT: LIVE FEED with ID... %s  \n", command_input);
+            // printf("id %d", id_inputted);
+            while (1)
+            {
+                request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
 
-        //     printf("id %d", id_inputted);
+                if (sendRequest(request, sockfd) == 1)
+                {
+                    printf("Client: Error, LIVEFEED with id request to server failed\n");
+                }
+                else
+                {
+                    // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
 
-        //     request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
+                    if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+                    {
+                        perror("Error! Failed to receive response from server!\n");
+                        printf("\n Error! Failed to receive response from server!\n");
+                    }
+                    else
+                    {
 
-        //     if (sendRequest(request, sockfd) == 1)
-        //     {
-        //         printf("Client: Error, LIVEFEED with id request to server failed\n");
-        //     }
-        //     else
-        //     {
-        //         // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
+                        if (serverResponse.error == 0)
+                        {
+                            printf("\n===============================================\n");
+                            printf("            SERVER RESPONSE (Success!)         \n");
+                            printf(" \t\t%s\n", serverResponse.message.content);
+                            printf("\n===============================================\n");
+                        }
+                        else
+                        {
+                            printf("\n ===============================================\n");
+                            printf("|            SERVER RESPONSE (Error)              \n");
+                            printf("|%s", serverResponse.message.content);
+                            printf("\n ===============================================\n");
 
-        //         if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
-        //         {
-        //             perror("Error! Failed to receive response from server!\n");
-        //             printf("\n Error! Failed to receive response from server!\n");
-        //         }
-        //         else
-        //         {
-        //             if (serverResponse.error == 0)
-        //             {
-        //                 printf("\n===============================================\n");
-        //                 printf("            SERVER RESPONSE (Success!)         \n");
-        //                 printf(" \t\t%s\n", serverResponse.message.content);
-        //                 printf("\n===============================================\n");
-        //             }
-        //             else
-        //             {
-        //                 printf("\n ===============================================\n");
-        //                 printf("|            SERVER RESPONSE (Error)              \n");
-        //                 printf("|%s", serverResponse.message.content);
-        //                 printf("\n ===============================================\n");
-        //             }
-        //         }
-        //     }
+                            break;
+                        }
 
-        //     id_inputted = RESET_INPUT;
+                        sleep(1);
+                    }
+                }
 
-        //     printf("\nType Command: ");
-        // }
+                sleep(1);
+            }
+
+            id_inputted = RESET_INPUT;
+
+            printf("\nType Command: ");
+        }
 
         // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
         //          id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
@@ -526,7 +483,7 @@ request_t createRequest(int command, int channel_id, int clientID, message_t *me
     clientRequest.commandID = command;
     clientRequest.channelID = channel_id;
     clientRequest.clientID = clientID;
-    clientRequest.liveFeed = liveFeedFlag;
+    clientRequest.liveFeedFlag = liveFeedFlag;
 
     if (message != NULL)
     {

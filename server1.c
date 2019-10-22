@@ -55,8 +55,8 @@
 #define LIVEFEED 6
 
 /* BOOLEAN */
-#define LIVEFEED_TRUE 0
-#define LIVEFEED_FALSE 1
+#define LIVEFEED_FLAG_TRUE 0
+#define LIVEFEED_FLAG_FALSE -1
 
 #define CLIENT_ACTIVE -1
 #define CLIENT_INACTIVE -2
@@ -337,7 +337,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     if (&successMessage.messageID != NULL)
                     {
-                        response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
+                        response_t response = createServerResponse(&successMessage, client, request->channelID, -1, LIVEFEED_FLAG_FALSE);
                         sendResponse(response, new_fd);
                     }
                 }
@@ -420,7 +420,7 @@ int handleClientRequests(request_t *request, client_t *client)
 
                     if (&successMessage.messageID != NULL)
                     {
-                        response_t response = createServerResponse(&successMessage, client, request->channelID, -1);
+                        response_t response = createServerResponse(&successMessage, client, request->channelID, -1, LIVEFEED_FLAG_FALSE);
                         sendResponse(response, new_fd);
                     }
                 }
@@ -514,7 +514,7 @@ int handleClientRequests(request_t *request, client_t *client)
                     { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                         // create server response to client WITH MESSAGE
-                        response_t response = createServerResponse(&unreadMessage, client, request->channelID, -1);
+                        response_t response = createServerResponse(&unreadMessage, client, request->channelID, -1, LIVEFEED_FLAG_FALSE);
 
                         if (response.error == 0)
                         {
@@ -653,7 +653,7 @@ int handleClientRequests(request_t *request, client_t *client)
                             { // NOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                                 // create server response to client WITH MESSAGE
-                                response_t response = createServerResponse(&unreadMessage, client, channel->channelID, totalUnreadMessageCount);
+                                response_t response = createServerResponse(&unreadMessage, client, channel->channelID, totalUnreadMessageCount, LIVEFEED_FLAG_FALSE);
 
                                 if (response.error == 0)
                                 {
@@ -686,96 +686,84 @@ int handleClientRequests(request_t *request, client_t *client)
         return 0;
     }
 
-    if (request->commandID == LIVEFEED_ID && request->liveFeed == LIVEFEED_TRUE)
+    if (request->commandID == LIVEFEED_ID && request->liveFeedFlag == LIVEFEED_FLAG_TRUE || request->liveFeedFlag == LIVEFEED_FLAG_FALSE)
     { // LIVEFEED with id
-        printf("Server: livefeed got channel id %d", request->channelID);
+        printf("Server: livefeed got channel id %d, livefeed flag %d", request->channelID, request->liveFeedFlag);
 
-        // int count = 0;
-        // channel_t *channel;
+        channel_t *channel;
 
-        // int totalUnreadMessageCount = 0;
+        channel = getChannel(request->channelID); // find the channel given channel id
 
-        // int notSubscribed = isClientSubscribedToAnyChannel(request->clientID); // TODO TMRW
+        if (channel != NULL)
+        {
+            client_t *client = findSubscriberInChannel(channel, request->clientID);
 
-        // if (notSubscribed == 1)
-        // { // client not subscribed to any channel
+            if (client != NULL)
+            {
+                printf("client is not null\n");
 
-        //     char *message = "Not subscribed to any channels.";
+                while (request->liveFeedFlag == LIVEFEED_FLAG_TRUE)
+                { // loop while the livefeed flag is true in request
+                    if (client->unReadMsg > 0)
+                    { // send reponse if there are unread Messages
+                        printf("\nlivefeed true\n");
+                        message_t unreadMessage = readNextMsgFromChannel(channel, client);
 
-        //     // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
-        //     message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
+                        if (&unreadMessage.messageID != NULL)
+                        { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
-        //     if (&noMsgErrorMessage != NULL)
-        //     {
-        //         response_t response = createServerErrorResponse(&noMsgErrorMessage);
-        //         sendResponse(response, new_fd);
-        //         printf("\nerror response send \n");
-        //     }
+                            // create server response to client WITH MESSAGE
+                            response_t response = createServerResponse(&unreadMessage, client, request->channelID, -1, LIVEFEED_FLAG_TRUE);
 
-        //     return 0;
-        // }
-        // else
-        // {
-        //     // // returns an integer that is the total number of next Unread Message in all channels for given client
-        //     // totalUnreadMessageCount = getNextNthMessageCount(request->clientID);
-        //     // printf("\n  1) total unread: %d \n", totalUnreadMessageCount);
+                            if (response.error == 0)
+                            {
+                                printf("\n________________________ \n");
+                                printf("NEXT %d Message Sending...|\n", request->channelID);
+                                printf("__________________________ \n");
 
-        //     // while() {
+                                printf("\nClientID: %d\n", response.clientID);
+                                printf("Next message : %s\n", response.message.content);
+                                printf("Error status : %d\n", response.error);
+                                printf("\n");
+                            }
 
-        //     // }
-        //     // Client subscribed to at least one channel at this point.
-        //     while (count <= MAX_CHANNELS)
-        //     {
-        //         channel = getChannel(count); // find the channel given channel id
+                            // send response to client
+                            sendResponse(response, new_fd);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                char *msg = "Not subscribed to channel: ";
+                char *message_ptr = parseMessage(msg, request->channelID);
 
-        //         if (channel != NULL)
-        //         {
-        //             client_t *client = findSubscriberInChannel(channel, request->clientID);
+                message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-        //             if (client != NULL)
-        //             {
-        //                 if (client->unReadMsg >= 1 && totalUnreadMessageCount != 0)
-        //                 {
-        //                     // printf("\n ------------> YES client->unReadMsg %d\n", client->unReadMsg);
-        //                     message_t unreadMessage = readNextMsgFromChannel(channel, client);
+                if (&errorMessage.messageID != NULL)
+                {
+                    response_t response = createServerErrorResponse(&errorMessage);
+                    sendResponse(response, new_fd);
+                }
+            }
+        }
+        else
+        {
+            char *msg = "Invalid channel: ";
+            char *message_ptr = parseMessage(msg, request->channelID);
 
-        //                     if (&unreadMessage != NULL)
-        //                     { // NOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
+            message_t errorMessage = createStatusResponseMessage(message_ptr, request->clientID);
 
-        //                         // create server response to client WITH MESSAGE
-        //                         response_t response = createServerResponse(&unreadMessage, client, channel->channelID, totalUnreadMessageCount);
-
-        //                         if (response.error == 0)
-        //                         {
-        //                             printf("\n________________________ \n");
-        //                             printf("NEXT %d Message Sending...|\n", request->channelID);
-        //                             printf("__________________________ \n");
-
-        //                             printf("\nClientID: %d\n", response.clientID);
-        //                             printf("Next message : %s\n", response.message.content);
-        //                             printf("UnReadMessageCOUNT : %d\n", response.unReadMessagesCount);
-        //                             printf("Error status : %d\n", response.error);
-        //                             printf("\n");
-        //                         }
-
-        //                         // send response to client
-        //                         sendResponse(response, new_fd);
-        //                         sleep(1);
-
-        //                         totalUnreadMessageCount--; // decrement the total count of next Unread messages client server needs to wait for
-        //                         // printf("\n DECREMENT number UNREAD COUNT %d <-- \n", totalUnreadMessageCount);
-        //                     }
-        //                 }
-        //             }
-        //         }
-
-        //         count++; // increment to next channel id
-        //     }
-        // }
-        return 0;
+            if (&errorMessage.messageID != NULL)
+            {
+                response_t response = createServerErrorResponse(&errorMessage);
+                sendResponse(response, new_fd);
+            }
+        }
     }
 
     return 0;
+    // print_channels_with_subscribers();
 }
 
 // don't need it?
@@ -1006,7 +994,7 @@ response_t createServerErrorResponse(message_t *message)
 // client_t client;
 
 // // Should i return a pointer response instead since using malloc? ask tutor
-response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount)
+response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount, int livefeedFlag)
 {
     response_t *response = malloc(sizeof(response_t));
 
@@ -1023,6 +1011,7 @@ response_t createServerResponse(message_t *message, client_t *client, int channe
         response->message = *message;
         response->error = 0;
         response->channel_id = channel_id;
+        response->liveFeedFlag = livefeedFlag;
     }
     else
     {

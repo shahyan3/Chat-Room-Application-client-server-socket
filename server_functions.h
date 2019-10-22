@@ -27,7 +27,7 @@ struct request
     int channelID;
     int clientID;
     message_t message;
-    int liveFeed;
+    int liveFeedFlag;
 };
 
 request_t clientRequest; /* move into main ??*/
@@ -66,6 +66,7 @@ struct response
     int error;
     int channel_id;
     int unReadMessagesCount;
+    int liveFeedFlag;
 };
 
 /*
@@ -113,7 +114,7 @@ int isClientSubscribedToAnyChannel(int client_id);
 
 int getNextNthMessageCount(int client_id);
 
-response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount);
+response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount, int liveFeedFlag);
 int sendResponse(response_t serverResponse, int sock_id);
 
 channel_t *getChannel(int channelID);

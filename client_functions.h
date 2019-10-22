@@ -24,7 +24,7 @@ struct request
     int channelID;
     int clientID;
     message_t client_message;
-    int liveFeed;
+    int liveFeedFlag;
 };
 
 typedef struct response response_t;
@@ -36,6 +36,7 @@ struct response
     int error;
     int channel_id;
     int unReadMessagesCount;
+    int liveFeedFlag
 };
 
 void display_options();
