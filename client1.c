@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
                             {
                                 printf("\n===============================================\n");
                                 printf("            SERVER RESPONSE (Success!)         \n");
-                                printf(" \t\t%s\n", serverResponse.message.content);
+                                printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
                                 printf("\n===============================================\n");
                             }
                             else
@@ -378,7 +378,7 @@ int main(int argc, char *argv[])
                             {
                                 printf("\n===============================================\n");
                                 printf("            SERVER RESPONSE (Success!)         \n");
-                                printf(" \t\t%s\n", serverResponse.message.content);
+                                printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
                                 printf("\n===============================================\n");
                             }
                             else
@@ -403,25 +403,6 @@ int main(int argc, char *argv[])
 
             printf("\nType Command: ");
         }
-
-        // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
-        //          id_inputted >= MIN_CHANNELS && id_inputted <= MAX_CHANNELS)
-        // { // // User enters LIVEFEED <channel id>
-        //     // printf("\n WITH ID %s  %d\n", command_input, id_inputted);
-
-        //     id_inputted = RESET_INPUT;
-
-        //     printf("\nType Command: ");
-        // }
-        // else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0 &&
-        //              id_inputted < MIN_CHANNELS ||
-        //          id_inputted > MAX_CHANNELS)
-        // {
-        //     // printf("\n ERR! Channel Id %d not found... \n", id_inputted);
-        //     id_inputted = RESET_INPUT;
-
-        //     printf("\nType Command: ");
-        // }
 
         // else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
         // { // // User enters BYE

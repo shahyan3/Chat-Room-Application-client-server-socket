@@ -818,7 +818,7 @@ int handleClientRequests(request_t *request, client_t *client)
                                 { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
 
                                     // create server response to client WITH MESSAGE
-                                    response_t response = createServerResponse(&unreadMessage, client, request->channelID, -1, LIVEFEED_FLAG_TRUE);
+                                    response_t response = createServerResponse(&unreadMessage, client, channel->channelID, -1, LIVEFEED_FLAG_TRUE);
 
                                     if (response.error == 0)
                                     {
