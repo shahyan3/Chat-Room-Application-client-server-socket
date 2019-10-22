@@ -700,7 +700,6 @@ int handleClientRequests(request_t *request, client_t *client)
 
             if (client != NULL)
             {
-                printf("client is not null\n");
 
                 while (request->liveFeedFlag == LIVEFEED_FLAG_TRUE)
                 { // loop while the livefeed flag is true in request
@@ -760,6 +759,96 @@ int handleClientRequests(request_t *request, client_t *client)
                 sendResponse(response, new_fd);
             }
         }
+    }
+
+    if (request->commandID == LIVEFEED && request->channelID == NO_CHANNEL && request->liveFeedFlag == LIVEFEED_FLAG_TRUE || request->liveFeedFlag == LIVEFEED_FLAG_FALSE)
+    {
+        printf("\nSERVER: LIVEFEED without id <%d> request received.\n", request->commandID);
+
+        int count = 0;
+        channel_t *channel;
+
+        int totalUnreadMessageCount = 0;
+
+        int notSubscribed = isClientSubscribedToAnyChannel(request->clientID);
+
+        if (notSubscribed == 1)
+        { // client not subscribed to any channel
+
+            char *message = "Not subscribed to any channels.";
+
+            // CREATE A response.errorMessage property to client with the message in printf? TODO: bug.
+            message_t noMsgErrorMessage = createStatusResponseMessage(message, request->clientID);
+
+            if (&noMsgErrorMessage.messageID != NULL)
+            {
+                response_t response = createServerErrorResponse(&noMsgErrorMessage);
+                sendResponse(response, new_fd);
+                printf("\nerror response send \n");
+            }
+
+            return 0;
+        }
+        else
+        {
+            // returns an integer that is the total number of next Unread Message in all channels for given client
+            // totalUnreadMessageCount = getNextNthMessageCount(request->clientID);
+            while (request->liveFeedFlag == LIVEFEED_FLAG_TRUE)
+            { // loop while the livefeed flag is true in request
+
+                // Client subscribed to at least one channel at this point.
+                while (count <= MAX_CHANNELS)
+                { // LOOP through each channel
+
+                    channel = getChannel(count); // find the channel given channel id
+
+                    if (channel != NULL)
+                    {
+                        client_t *client = findSubscriberInChannel(channel, request->clientID);
+
+                        if (client != NULL)
+                        {
+
+                            if (client->unReadMsg > 0)
+                            { // send reponse if there are unread Messages
+                                printf("\nlivefeed true\n");
+                                message_t unreadMessage = readNextMsgFromChannel(channel, client);
+
+                                if (&unreadMessage.messageID != NULL)
+                                { // MOTE: NEXT NULL BECAUSE OUTER IF STATEMENT IS TRUE i.e. client->unReadMsg > 0
+
+                                    // create server response to client WITH MESSAGE
+                                    response_t response = createServerResponse(&unreadMessage, client, request->channelID, -1, LIVEFEED_FLAG_TRUE);
+
+                                    if (response.error == 0)
+                                    {
+                                        printf("\n________________________ \n");
+                                        printf("NEXT %d Message Sending...|\n", request->channelID);
+                                        printf("__________________________ \n");
+
+                                        printf("\nClientID: %d\n", response.clientID);
+                                        printf("Next message : %s\n", response.message.content);
+                                        printf("Error status : %d\n", response.error);
+                                        printf("\n");
+                                    }
+
+                                    // send response to client
+                                    sendResponse(response, new_fd);
+                                }
+                            }
+                        }
+                    }
+
+                    count++; // increment to next channel id
+
+                    if (count == MAX_CHANNELS)
+                    { // reset channel count infinitely
+                        count = 0;
+                    }
+                }
+            }
+        }
+        return 0;
     }
 
     return 0;

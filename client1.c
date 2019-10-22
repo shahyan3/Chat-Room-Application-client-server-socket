@@ -298,54 +298,105 @@ int main(int argc, char *argv[])
 
             printf("\n => Type Command: ");
         }
-        // Livefeed with id
+        // Livefeed
         else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0)
         { // User enters LIVEFEED only
-            // printf("\n CLIENT: LIVE FEED with ID... %s  \n", command_input);
 
             // printf("id %d", id_inputted);
-            while (1)
-            {
-                request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
+            if (id_inputted == NO_CHANNEL_ID)
+            { // LIVEFEED no ID
+                printf("\n CLIENT: LIVEFEED no ID... %s  \n", command_input);
 
-                if (sendRequest(request, sockfd) == 1)
+                while (1)
                 {
-                    printf("Client: Error, LIVEFEED with id request to server failed\n");
-                }
-                else
-                {
-                    // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
+                    request_t request = createRequest(LIVEFEED, id_inputted, clientID, NULL, LIVEFEED_TRUE);
 
-                    if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+                    if (sendRequest(request, sockfd) == 1)
                     {
-                        perror("Error! Failed to receive response from server!\n");
-                        printf("\n Error! Failed to receive response from server!\n");
+                        printf("Client: Error, LIVEFEED with id request to server failed\n");
                     }
                     else
                     {
-
-                        if (serverResponse.error == 0)
+                        // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
+                        if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
                         {
-                            printf("\n===============================================\n");
-                            printf("            SERVER RESPONSE (Success!)         \n");
-                            printf(" \t\t%s\n", serverResponse.message.content);
-                            printf("\n===============================================\n");
+                            perror("Error! Failed to receive response from server!\n");
+                            printf("\n Error! Failed to receive response from server!\n");
                         }
                         else
                         {
-                            printf("\n ===============================================\n");
-                            printf("|            SERVER RESPONSE (Error)              \n");
-                            printf("|%s", serverResponse.message.content);
-                            printf("\n ===============================================\n");
 
-                            break;
+                            if (serverResponse.error == 0)
+                            {
+                                printf("\n===============================================\n");
+                                printf("            SERVER RESPONSE (Success!)         \n");
+                                printf(" \t\t%s\n", serverResponse.message.content);
+                                printf("\n===============================================\n");
+                            }
+                            else
+                            {
+                                printf("\n ===============================================\n");
+                                printf("|            SERVER RESPONSE (Error)              \n");
+                                printf("|%s", serverResponse.message.content);
+                                printf("\n ===============================================\n");
+
+                                break;
+                            }
+
+                            sleep(1);
                         }
-
-                        sleep(1);
                     }
-                }
 
-                sleep(1);
+                    sleep(1);
+                }
+            }
+            else
+            { // Livefeed with ID
+                printf("\n CLIENT: LIVEFEED with ID... %s  \n", command_input);
+
+                while (1)
+                {
+                    request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
+
+                    if (sendRequest(request, sockfd) == 1)
+                    {
+                        printf("Client: Error, LIVEFEED with id request to server failed\n");
+                    }
+                    else
+                    {
+                        // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
+
+                        if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
+                        {
+                            perror("Error! Failed to receive response from server!\n");
+                            printf("\n Error! Failed to receive response from server!\n");
+                        }
+                        else
+                        {
+
+                            if (serverResponse.error == 0)
+                            {
+                                printf("\n===============================================\n");
+                                printf("            SERVER RESPONSE (Success!)         \n");
+                                printf(" \t\t%s\n", serverResponse.message.content);
+                                printf("\n===============================================\n");
+                            }
+                            else
+                            {
+                                printf("\n ===============================================\n");
+                                printf("|            SERVER RESPONSE (Error)              \n");
+                                printf("|%s", serverResponse.message.content);
+                                printf("\n ===============================================\n");
+
+                                break;
+                            }
+
+                            sleep(1);
+                        }
+                    }
+
+                    sleep(1);
+                }
             }
 
             id_inputted = RESET_INPUT;
