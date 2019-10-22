@@ -1,0 +1,10 @@
+
+Critical sections
+
+writing a message -> writeReqToChannel() | check
+
+subscribing to channel -> subscribe()	| check
+
+usubscribing a channel -> unsubscribe() | check
+
+upon reading from channel the client's message queue is incremented (in readNextMsgFromChannel) -> searchNextMsgInList() |check

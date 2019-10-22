@@ -1,8 +1,3 @@
-/*
-*  Materials downloaded from the web. See relevant web sites listed on OLT
-*  Collected and modified for teaching purpose only by Jinglan Zhang, Aug. 2006
-*/
-
 #define _XOPEN_SOURCE // sigaction obj needs this to work...man 7 feature_test_macros
 #define STDOUT_FILENO 1;
 
@@ -19,6 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
+#include <pthread.h> /* pthread */
 
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -63,8 +59,14 @@
 
 #define SIZEOFMEMORY 27
 
+// SOCKET fd
 int sockfd;
 int new_fd; /* listen on sock_fd, new connection on new_fd */
+
+/*
+*   MUTEX LOCK
+*/
+pthread_mutex_t mutex_lock;
 
 /*
 *   SHARED MEMORY 
@@ -98,6 +100,9 @@ void shut_down_handler()
 
 int main(int argc, char *argv[])
 {
+    // initialize mutex lock - new threads will be given lock
+    pthread_mutex_init(&mutex_lock, NULL);
+
     int port = 12345;
 
     // signal handling
@@ -202,8 +207,7 @@ int main(int argc, char *argv[])
 
         if (!fork())
         { /* this is the child process */
-            printf("\n-----------------------CHILD START ----------\n");
-            printf("\n child process id is %d. parent id is: %d\n", getpid(), getppid());
+            // printf("\n child process id is %d. parent id is: %d\n", getpid(), getppid());
 
             /*
             * Now we attach the segment to our data space.
@@ -229,8 +233,6 @@ int main(int argc, char *argv[])
                 // send response to client Cant accept connection
             }
 
-            printf("\n-------------------------------------------\n");
-
             // Send: Welcome Message.
             if (send(new_fd, &client.clientID, sizeof(int), 0) == -1)
             {
@@ -238,6 +240,7 @@ int main(int argc, char *argv[])
                 printf("Error: Welcome message not sent to client \n");
             }
 
+            // Handle incoming client requests
             while (recv(new_fd, &clientRequest, sizeof(request_t), 0))
             {
 
@@ -852,26 +855,6 @@ int handleClientRequests(request_t *request, client_t *client)
     }
 
     return 0;
-    // print_channels_with_subscribers();
-}
-
-// don't need it?
-int parseRequest(int new_fd, char *clientRequest, char *user_command, char *channel_id)
-{
-    char *string_ptr;
-    char delim[] = " ";
-
-    string_ptr = strtok(clientRequest, delim);
-
-    strcpy(user_command, string_ptr);
-    // printf("%s", user_command);
-    string_ptr = strtok(NULL, delim);
-
-    strcpy(channel_id, string_ptr);
-    // printf("%s", channel_id);
-    string_ptr = strtok(NULL, delim);
-
-    return 0;
 }
 
 client_t generate_client(int child_id)
@@ -1012,7 +995,9 @@ char *parseMessage(char *msg, int channel_id)
 }
 
 int unSubscribe(int channel_id, int client_id)
-{ // Delete clinet from linked list
+{ // removing client from array
+    // critical section - removing the correct index in subscribers list in shared memory
+    pthread_mutex_lock(&mutex_lock);
 
     channel_t *channel = getChannel(channel_id);
 
@@ -1024,7 +1009,6 @@ int unSubscribe(int channel_id, int client_id)
         {
             if (channel->subscribers[i].clientID == client_id)
             {
-                // printf("\nunsubinggggg  client id %d\n\n", channel->subscribers[i].clientID);
                 int pos = i; // pos = index to delete
 
                 for (i = pos - 1; i < channel->subscriberCount; i++)
@@ -1040,6 +1024,8 @@ int unSubscribe(int channel_id, int client_id)
     }
 
     return 0;
+
+    pthread_mutex_unlock(&mutex_lock);
 }
 
 channel_t *getChannel(int channelID)
@@ -1080,9 +1066,8 @@ response_t createServerErrorResponse(message_t *message)
 
     return *response;
 }
-// client_t client;
 
-// // Should i return a pointer response instead since using malloc? ask tutor
+//
 response_t createServerResponse(message_t *message, client_t *client, int channel_id, int unReadMessageCount, int livefeedFlag)
 {
     response_t *response = malloc(sizeof(response_t));
@@ -1180,9 +1165,10 @@ client_t *findSubscriberInChannel(channel_t *channel, int clientID)
 
 void subscribe(client_t *client_, int channel_id)
 {
-    int i = 0;
+    // CRITICAL SECTION - writing to shared memory hostedChannels subscriber array
+    pthread_mutex_lock(&mutex_lock);
 
-    //CRITICAL SECTION - writing to shared memory hostedChannels subscriber array ?
+    int i = 0;
 
     client_t *client = malloc(sizeof(client_t));
     *client = *client_;
@@ -1219,10 +1205,14 @@ void subscribe(client_t *client_, int channel_id)
             sharedChannels->hostedChannels[i].subscriberCount += 1;
         }
     }
+    // unlock mutex
+    pthread_mutex_unlock(&mutex_lock);
 }
 
 void writeToChannelReq(request_t *request, channel_t *channel)
-{ // critical section **&^%$%^&&^%
+{
+    // critical section
+    pthread_mutex_lock(&mutex_lock);
 
     int i, j = 0;
 
@@ -1253,7 +1243,8 @@ void writeToChannelReq(request_t *request, channel_t *channel)
     // // works: update unreadMsg property for all subcribed clients except client with this clientID
     updateUnreadMsgCountForSubscribers(channel);
 
-    // // end of critical section ?
+    // // end of critical section
+    pthread_mutex_unlock(&mutex_lock);
 }
 
 void print_channel_messages()
@@ -1282,6 +1273,9 @@ void print_channel_messages()
 
 message_t searchNextMsgInList(channel_t *channel, client_t *client)
 {
+    // critical section - updating the client's next queues ??
+    pthread_mutex_lock(&mutex_lock);
+
     int i, j, k = 0;
 
     message_t unreadMessage;
@@ -1312,6 +1306,8 @@ message_t searchNextMsgInList(channel_t *channel, client_t *client)
             }
         }
     }
+    // unlock mutex
+    pthread_mutex_unlock(&mutex_lock);
 
     return unreadMessage;
 }
@@ -1320,8 +1316,6 @@ message_t readNextMsgFromChannel(channel_t *channel, client_t *client)
 {
 
     message_t unreadMessage = searchNextMsgInList(channel, client);
-
-    // printf("\n 2.Next msg: %s\n", unreadMessage.content);
 
     return unreadMessage;
 }
@@ -1338,73 +1332,3 @@ message_t createStatusResponseMessage(char *message, int clientID)
 
     return statusMessage;
 }
-
-// // NEXT: returns unread message from all channels one by one
-// message_t readNextMsgFromAllChannel(int clientID)
-// {
-//     // int i = 0;
-//     // client_t *foundClient;
-//     // message_t unreadMessage;
-//     // channel_t *channel;
-
-//     // for (i = 0; i < MAX_CHANNELS; i++)
-//     // {
-//     //     channel = &hostedChannels[1];
-//     //     foundClient = findSubscriberInChannel(channel, clientID);
-
-//     //     if (foundClient != NULL && foundClient->clientID == clientID)
-//     //     { // Found channel client is subscribed too!
-//     //         unreadMessage = readNextMsgFromChannel(channel, foundClient);
-
-//     //         return unreadMessage;
-//     //     }
-//     // }
-// }
-
-// // counts the nextUnread message from all channels, returns the count
-// int nextMessageCountInChannels(int clientID)
-// {
-//     // int i = 0;
-//     // int totalUnreadMsg = 0;
-
-//     // client_t *foundClient;
-//     // message_t unreadMessage;
-//     // channel_t *channel;
-
-//     // for (i = 0; i < MAX_CHANNELS; i++)
-//     // {
-//     //     channel = &hostedChannels[i];
-//     //     if (channel != NULL)
-//     //     {
-//     //         foundClient = findSubscriberInChannel(channel, clientID);
-
-//     //         // test below
-//     //         if (foundClient != NULL)
-//     //         {
-//     //             printf("\n\nclientid %d, CHANNEL ID %d given. \n", clientID, channel->channelID);
-//     //             printf("\n Result:FOUND client ID: %d \n", foundClient->clientID);
-//     //         }
-//     //         // test above
-
-//     //         if (foundClient != NULL && foundClient->clientID == clientID)
-//     //         { // Found channel client is subscribed too!
-
-//     //             printf("\n #Subscriber found in channel \n");
-
-//     //             unreadMessage = readNextMsgFromChannel(channel, foundClient);
-
-//     //             if (&unreadMessage != NULL)
-//     //             {
-//     //                 totalUnreadMsg += 1;
-//     //                 printf("\nmessage FOUND ID %d %s\n", unreadMessage.ownerID, unreadMessage.content);
-//     //                 printf("total msg num: %d\n", totalUnreadMsg);
-//     //             }
-//     //         }
-//     //     }
-//     //     // printf("for loop i = %d", i);
-//     // }
-
-//     // printf("()()() count final: %d\n\n", totalUnreadMsg);
-
-//     // return totalUnreadMsg;
-// }
