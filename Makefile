@@ -27,7 +27,7 @@ TARGET=client server
 
 CC=gcc
 
-CFLAGS= -Wall -Wextra -g -I.
+CFLAGS= -Wall -Wextra -g -I. -pthread
 
 normal: $(TARGET)
 

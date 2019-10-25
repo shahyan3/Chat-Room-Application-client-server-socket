@@ -4,8 +4,11 @@
 #define MAX_MESSAGE_LENGTH 1024
 
 #define MAX_CLIENTS 100
+#define MAX_CHANNELS 256
 
 #define MAX_MESSAGE_COUNT 1000
+
+/* STRUCTS */
 
 typedef struct message message_t;
 
@@ -14,7 +17,6 @@ struct message
     int messageID;
     int ownerID;
     char content[MAX_MESSAGE_LENGTH];
-    // message_t *next;
 };
 
 message_t client_message;
@@ -30,7 +32,7 @@ struct request
     int liveFeedFlag;
 };
 
-request_t clientRequest; /* move into main ??*/
+request_t clientRequest;
 
 typedef struct client client_t;
 
@@ -43,7 +45,6 @@ struct client
     int messageQueueIndex;  /* index = message that it read currently, NOT NEXT ONE */
     int entryIndexConstant; /* index of msg queue at which the client subed */
     int status;
-    // client_t *next;
 };
 
 typedef struct channel channel_t;
@@ -69,24 +70,33 @@ struct response
     int liveFeedFlag;
 };
 
-/*
-    CHANNEL FUNCTIONS (INCLUDE IN SEPERATE FILE LATER)
-*/
+/* struct to hold data to be passed to a thread */
+typedef struct str_thdata
+{
+    int thread_no;
+    int clientID;
+    int channel_id;
+    int totalUnreadMessageCount;
+} thdata;
 
-// Creates 256 channels for global hostedChannels array
+/* SHARED MEMORY */
+
+struct shared
+{
+    channel_t hostedChannels[MAX_CHANNELS];
+} typedef sharedMemory_t;
+
+/* Functions */
+
 channel_t *generateHostChannels();
 
-client_t generate_client(int child_id); // cretes inactive client objects to the channels
+client_t generate_client(int child_id);
 int randomClientIdGenerator();
 
 void print_channels_with_subscribers();
 
-// when subscribing to channel, finds out the last message in the channel, and will be used to add the message id to the subscribing client
 message_t createStatusResponseMessage(char *message, int clientID);
 response_t createServerErrorResponse(message_t *message);
-
-// // SUBSCRIBE AND UNSUBSCRIBE FUNCS
-// message_t *findLastMsgInLinkedList(channel_t channel);
 
 void subscribe(client_t *client_, int channel_id);
 
@@ -121,13 +131,8 @@ channel_t *getChannel(int channelID);
 
 int handleClientRequests(request_t *request, client_t *client);
 
-// int parseRequest(int new_fd, char *clientRequest, char *user_command, char *channel_id);
+void handleNextSend(void *ptr);
 
-// message_t readNextMsgFromAllChannel(int clientID); // next no id
-// int nextMessageCountInChannels(int clientID);
-
-/*
-    END OF
-*/
+void shut_down_handler();
 
 #endif //__SERVER_H__

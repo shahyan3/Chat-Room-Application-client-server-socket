@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "server_functions.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "ipc.h": "c",
+        "signal.h": "c"
     }
 }

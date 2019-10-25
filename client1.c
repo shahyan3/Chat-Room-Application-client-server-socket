@@ -10,8 +10,13 @@
 
 #include <ctype.h>
 #include <stdbool.h>
+#include <pthread.h> /* pthread */
 
 #include "client_functions.h"
+
+#define _XOPEN_SOURCE // sigaction obj needs this to work...man 7 feature_test_macros
+
+#include <signal.h>
 
 #define RETURNED_ERROR -1
 #define SERVER_ON_CONNECT_MSG_SIZE 40
@@ -36,6 +41,8 @@
 #define NEXT 5
 #define LIVEFEED 6
 
+#define BYE 100
+
 /* BOOLEAN */
 #define LIVEFEED_TRUE 0
 #define LIVEFEED_FALSE 1
@@ -43,16 +50,30 @@
 /*
     GLOBAL 
 */
-
-// int msgSentCount = 0;
 response_t serverResponse;
+
+void shut_down_handler()
+{
+    printf("\n\nBYE! Closing application now.... \n");
+
+    sleep(1);
+    exit(1);
+}
 
 int main(int argc, char *argv[])
 {
+    // Threads to be used for Next/Livefeed
+    pthread_t thread1;
+    pthread_t thread2;
 
-    int sockfd, i = 0;
-    int *client;
-    request_t *clientRequest;
+    thdata data1;
+
+    // signal handling  // TODO: ctlr c should shutdown gracefully !!!!
+    struct sigaction sa;
+    sa.sa_handler = shut_down_handler;
+    sigaction(SIGINT, &sa, NULL);
+
+    int sockfd = 0;
 
     message_t client_message;
 
@@ -93,24 +114,18 @@ int main(int argc, char *argv[])
 
     /* Receive message back from server */
     int clientID = connection_success(sockfd);
-    // printf("checking client id %d", clientID);
 
     int id_inputted = RESET_INPUT;
 
     int *id_ptr = &id_inputted; /* Pointer to user inputted channel id*/
 
     char command_input[10]; /* User inputted command i.e. SUB, NEXT etc. */
-    char *command_input_ptr = command_input;
 
     char user_input[20]; /* user input */
-    char *user_input_ptr = user_input;
 
-    // char message[MAX_MESSAGE_LENGTH];
     char *message = (char *)malloc(sizeof(char) * MAX_MESSAGE_LENGTH);
 
-    // char *user_msg_ptr = message;
-
-    display_menu();
+    display_menu(); // Client menu
 
     while (fgets(user_input, 20, stdin))
     {
@@ -125,7 +140,6 @@ int main(int argc, char *argv[])
 
         else if ((strncmp(command_input, "SUB", strlen("SUB")) == 0))
         {
-            printf("SUB %d", id_inputted);
 
             request_t request = createRequest(SUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
@@ -135,7 +149,6 @@ int main(int argc, char *argv[])
             }
             else
             {
-                printf("\nClient: Successfully sub request to server...\n");
 
                 if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
                 {
@@ -167,7 +180,6 @@ int main(int argc, char *argv[])
         }
         else if ((strncmp(command_input, "UNSUB", strlen("UNSUB")) == 0))
         {
-            printf("UNSUB %d", id_inputted);
 
             request_t request = createRequest(UNSUB, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
@@ -177,7 +189,6 @@ int main(int argc, char *argv[])
             }
             else
             {
-                // printf("\nClient: Successfully sent UNSUB request to server...\n");
 
                 if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
                 {
@@ -210,102 +221,61 @@ int main(int argc, char *argv[])
 
         else if (strncmp(command_input, "NEXT", strlen("NEXT")) == 0)
         { // // User enters NEXT <channel id>
-            // printf("\n Next ID %s  %d\n", command_input, id_inputted);
 
             request_t request;
 
             if (id_inputted == NO_CHANNEL_ID)
             { // NEXT without id
-                request = createRequest(NEXT, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
-                if (sendRequest(request, sockfd) == 1)
-                {
-                    printf("Client: Error, NEXT message request to server failed\n");
-                }
-                else
-                {
-                    printf("\nClient: Successfully sent NEXT message request to server...\n");
+                data1.clientID = clientID; /* threads data */
+                data1.channel_id = id_inputted;
+                data1.sockfd = sockfd;
 
-                    // printf("\n 0.0 serverResponse %d\n", serverResponse.unReadMessagesCount);
+                // Thread1: handles sending NEXT request to server
+                pthread_create(&thread1, NULL, (void *(*)(void *))handleNextSendClient, (void *)&data1);
 
-                    while (recv(sockfd, &serverResponse, sizeof(response_t), 0))
-                    {
+                pthread_attr_t attr;
+                pthread_attr_init(&attr);
+                // Thread2: handles receiving responses from server
+                pthread_create(&thread2, &attr, (void *)(void *)handleNextReceiveClient, (void *)&data1);
 
-                        if (serverResponse.error == 1)
-                        { // IF USER TYPES "NEXT" WITHOUT SUBSCRIBING TO ANY CHANNEL. Display error.
-                            printf("\n ===============================================\n");
-                            printf("|            SERVER RESPONSE (Error)              \n");
-                            printf("| %s ", serverResponse.message.content);
-                            printf("\n ===============================================\n");
-
-                            break;
-                        }
-
-                        if (serverResponse.unReadMessagesCount >= 1) //Todo : error
-                        {
-                            if (serverResponse.error == 0)
-                            {
-                                printf("\n===============================================\n");
-                                printf("            SERVER RESPONSE (Success!)         \n\n");
-                                printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                                printf("===============================================\n");
-                            }
-
-                            if (serverResponse.unReadMessagesCount == 1)
-                            { // Last unreadCount displayed, break the recieving steam loop
-                                break;
-                            }
-                        }
-                    }
-                }
+                pthread_join(thread1, NULL);
+                pthread_join(thread2, NULL);
             }
             else
             { // NEXT with id
                 request = createRequest(NEXT_ID, id_inputted, clientID, NULL, LIVEFEED_FALSE);
 
-                printf("\n Next ID %s  %d\n", command_input, id_inputted);
-
                 if (sendRequest(request, sockfd) == 1)
                 {
                     printf("Client: Error, NEXT message request to server failed\n");
                 }
                 else
                 {
-                    printf("\nClient: Successfully sent NEXT message request to server...\n");
+                    data1.clientID = clientID; /* threads data */
+                    data1.channel_id = id_inputted;
+                    data1.sockfd = sockfd;
 
-                    if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
-                    {
+                    pthread_attr_t attr;
+                    pthread_attr_init(&attr);
+                    // Thread: handles receiving responses from server
+                    pthread_create(&thread2, &attr, (void *)(void *)handleMessageReceiveClient, (void *)&data1);
 
-                        if (serverResponse.error == 0)
-                        {
-                            printf("\n===============================================\n");
-                            printf("            SERVER RESPONSE (Success!)         \n\n");
-                            printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                            printf("===============================================\n");
-                        }
-                        else
-                        {
-                            printf("\n ===============================================\n");
-                            printf("|            SERVER RESPONSE (Error)              \n");
-                            printf("| %s ", serverResponse.message.content);
-                            printf("\n ===============================================\n");
-                        }
-                    }
+                    pthread_join(thread2, NULL);
                 }
             }
 
             id_inputted = RESET_INPUT;
 
-            printf("\n => Type Command: ");
+            printf("\n Type Command: ");
         }
         // Livefeed
         else if (strncmp(command_input, "LIVEFEED", strlen("LIVEFEED")) == 0)
-        { // User enters LIVEFEED only
+        { // LIVEFEED
 
-            // printf("id %d", id_inputted);
             if (id_inputted == NO_CHANNEL_ID)
             { // LIVEFEED no ID
-                printf("\n CLIENT: LIVEFEED no ID... %s  \n", command_input);
+                printf("\n Livefeed on...\n");
 
                 while (1)
                 {
@@ -317,34 +287,20 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
-                        if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
-                        {
-                            perror("Error! Failed to receive response from server!\n");
-                            printf("\n Error! Failed to receive response from server!\n");
-                        }
-                        else
-                        {
+                        data1.clientID = clientID; /* threads data */
+                        data1.channel_id = id_inputted;
+                        data1.sockfd = sockfd;
 
-                            if (serverResponse.error == 0)
-                            {
-                                printf("\n===============================================\n");
-                                printf("            SERVER RESPONSE (Success!)         \n");
-                                printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                                printf("\n===============================================\n");
-                            }
-                            else
-                            {
-                                printf("\n ===============================================\n");
-                                printf("|            SERVER RESPONSE (Error)              \n");
-                                printf("|%s", serverResponse.message.content);
-                                printf("\n ===============================================\n");
+                        pthread_attr_t attr;
+                        pthread_attr_init(&attr);
+                        // Thread: handles receiving responses from server
+                        pthread_create(&thread2, &attr, (void *)(void *)handleMessageReceiveClient, (void *)&data1);
 
-                                break;
-                            }
+                        pthread_join(thread2, NULL);
 
-                            sleep(1);
-                        }
+                        id_inputted = RESET_INPUT;
+
+                        printf("\nType Command: ");
                     }
 
                     sleep(1);
@@ -352,50 +308,36 @@ int main(int argc, char *argv[])
             }
             else
             { // Livefeed with ID
-                printf("\n CLIENT: LIVEFEED with ID... %s  \n", command_input);
+                printf("\n Livefeed on...\n");
 
-                while (1)
+                request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
+
+                if (sendRequest(request, sockfd) == 1)
                 {
-                    request_t request = createRequest(LIVEFEED_ID, id_inputted, clientID, NULL, LIVEFEED_TRUE);
-
-                    if (sendRequest(request, sockfd) == 1)
+                    printf("Client: Error, LIVEFEED with id request to server failed\n");
+                }
+                else
+                {
+                    while (1)
                     {
-                        printf("Client: Error, LIVEFEED with id request to server failed\n");
+
+                        data1.clientID = clientID; /* threads data */
+                        data1.channel_id = id_inputted;
+                        data1.sockfd = sockfd;
+
+                        pthread_attr_t attr;
+                        pthread_attr_init(&attr);
+                        // Thread: handles receiving responses from server
+                        pthread_create(&thread2, &attr, (void *)(void *)handleMessageReceiveClient, (void *)&data1);
+
+                        pthread_join(thread2, NULL);
+
+                        id_inputted = RESET_INPUT;
+
+                        printf("\nType Command: ");
+
+                        sleep(1);
                     }
-                    else
-                    {
-                        // printf("\nClient: Successfully sent LIVEFEED_ID request to server...\n");
-
-                        if (recv(sockfd, &serverResponse, sizeof(response_t), 0) == -1)
-                        {
-                            perror("Error! Failed to receive response from server!\n");
-                            printf("\n Error! Failed to receive response from server!\n");
-                        }
-                        else
-                        {
-
-                            if (serverResponse.error == 0)
-                            {
-                                printf("\n===============================================\n");
-                                printf("            SERVER RESPONSE (Success!)         \n");
-                                printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
-                                printf("\n===============================================\n");
-                            }
-                            else
-                            {
-                                printf("\n ===============================================\n");
-                                printf("|            SERVER RESPONSE (Error)              \n");
-                                printf("|%s", serverResponse.message.content);
-                                printf("\n ===============================================\n");
-
-                                break;
-                            }
-
-                            sleep(1);
-                        }
-                    }
-
-                    sleep(1);
                 }
             }
 
@@ -404,27 +346,14 @@ int main(int argc, char *argv[])
             printf("\nType Command: ");
         }
 
-        // else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
-        // { // // User enters BYE
-        //     printf("\n %s \n", command_input);
-        //     printf("\n BYE BYE! \n");
-        //     id_inputted = RESET_INPUT;
-
-        //     sleep(1);
-        //     exit(1);
-        // }
-
         else if (strncmp(command_input, "SEND", strlen("SEND")) == 0)
         { // User enters SEND<channelid><message>
-            // printf("\n=> %s  %d \n", command_input, id_inputted);
 
             // Ask for message input.
             printf("Enter Your Message: ");
             fgets(message, MAX_MESSAGE_LENGTH, stdin);
-            // printf("\nMessage by user:%s\n", message);
 
             // Create a message obect
-
             if (parseUserMessage(&client_message, message, clientID) == 1)
             {
                 perror("CLIENT: Parse Error: Invalid or no message found.\n");
@@ -440,8 +369,6 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    // printf("\nClient: Successfully sent message request to server...\n");
-
                     if (recv(sockfd, &serverResponse, sizeof(response_t), 0))
                     {
                         printf("\n ===============================================\n");
@@ -456,6 +383,11 @@ int main(int argc, char *argv[])
 
             printf("\nType Command: ");
         }
+        else if (strncmp(command_input, "BYE", strlen("BYE")) == 0)
+        { // // User enters BYE
+
+            bye(BYE, id_inputted, clientID, client_message, LIVEFEED_FALSE, sockfd);
+        }
         else
         {
             printf("\nIncorrect Input.\n");
@@ -465,14 +397,169 @@ int main(int argc, char *argv[])
         }
     }
 
-    // close(sockfd);
-
     return 0;
 }
 
-int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED? */
+/***********************************************************************
+ * func:            Thread function used to handle incoming response 
+ *                  messages from server. Generic implementation used for 
+ *                  LIVEFEED
+ *                 
+ * param ptr:      void pointer that points to thdata struct to access 
+ *                  socket fd variable
+***********************************************************************/
+void handleMessageReceiveClient(void *ptr)
 {
-    // char buff[SERVER_ON_CONNECT_MSG_SIZE];
+    thdata *data;
+    data = (thdata *)ptr; /* type cast to a pointer to thdata */
+
+    if (recv(data->sockfd, &serverResponse, sizeof(response_t), 0))
+    {
+
+        if (serverResponse.error == 1)
+        { // IF USER TYPES "NEXT" WITHOUT SUBSCRIBING TO ANY CHANNEL. Display error.
+            printf("\n ===============================================\n");
+            printf("|            SERVER RESPONSE (Error)              \n");
+            printf("| %s ", serverResponse.message.content);
+            printf("\n ===============================================\n");
+
+            return;
+        }
+
+        if (serverResponse.error == 0)
+        {
+            printf("\n===============================================\n");
+            printf("            SERVER RESPONSE (Success!)         \n\n");
+            printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
+            printf("===============================================\n");
+        }
+
+        if (serverResponse.unReadMessagesCount == 1)
+        { // Last unreadCount displayed, break the recieving steam loop
+
+            return;
+        }
+    }
+}
+
+/***********************************************************************
+ * func:            Thread function used to handle incoming response 
+ *                  messages from server. This function receives multiple
+ *                  incoming data stream in a while loop from sever; used for NEXT command
+ *                  specifically.
+ *                 
+ * param ptr:      void pointer that points to thdata struct to access 
+ *                 socket fd variable
+***********************************************************************/
+void handleNextReceiveClient(void *ptr)
+{
+
+    thdata *data;
+    data = (thdata *)ptr; /* type cast to a pointer to thdata */
+
+    while (recv(data->sockfd, &serverResponse, sizeof(response_t), 0) >= 1)
+    {
+
+        if (serverResponse.error == 1)
+        { // Display error.
+            printf("\n ===============================================\n");
+            printf("|            SERVER RESPONSE (Error)              \n");
+            printf("| %s ", serverResponse.message.content);
+            printf("\n ===============================================\n");
+
+            return;
+        }
+
+        if (serverResponse.error == 0)
+        {
+            printf("\n===============================================\n");
+            printf("            SERVER RESPONSE (Success!)         \n\n");
+            printf(" \t\t%d:%s\n", serverResponse.channel_id, serverResponse.message.content);
+            printf("===============================================\n");
+        }
+
+        if (serverResponse.unReadMessagesCount == 1)
+        { // Last unreadCount displayed, break the recieving steam loop
+
+            return;
+        }
+    }
+    if (recv(data->sockfd, &serverResponse, sizeof(response_t), 0) == 0)
+    { // end of recv stream
+        return;
+    }
+}
+/***********************************************************************
+ * func:            Thread function used to send request to server for 
+ *                  NEXT command specifically. 
+ *                 
+ * param ptr:      void pointer that points to thdata struct to access 
+ *                  channnel id and client id
+***********************************************************************/
+void handleNextSendClient(void *ptr)
+{
+
+    thdata *data;
+    data = (thdata *)ptr; /* type cast to a pointer to thdata */
+
+    request_t request = createRequest(NEXT, data->channel_id, data->clientID, NULL, LIVEFEED_FALSE);
+
+    if (sendRequest(request, data->sockfd) == 1)
+    {
+        printf("Client: Error, NEXT message request to server failed\n");
+    }
+    else
+    {
+        // printf("\nClient: Successfully sent NEXT message request to server...\n");
+    }
+}
+
+/**************************************************************************************
+ * func:                    Handles gracefully shutting down the client server
+ *                          by notifying the server with a request and shutting down.    
+ *                 
+ * param userCommand:       The numerical value of the userCommand i.e. NEXT, SUB etc.
+ * 
+ * param id_inputted:       Channel id inputted by user            
+ *  
+ * 
+ * param clientID:          Client id of the given user
+ * 
+ * param client_message:    Client message struct to send server before shutting down      
+ * 
+ * param liveFeedFlag:      Livefeed boolean flag i.e. is livefeed on / off
+ * 
+ * param sockfd:            Socket file descripter
+****************************************************************************************/
+void bye(int userCommand, int id_inputted, int clientID, message_t client_message, int liveFeedFlag, int sockfd)
+{
+    request_t request = createRequest(BYE, id_inputted, clientID, &client_message, liveFeedFlag);
+
+    if (sendRequest(request, sockfd) == 1)
+    {
+        printf("Client: Error, send Bye request to server failed\n");
+    }
+    else
+    { // successful send client request. Gracefully shutdown.
+
+        printf("\n\nBYE! Closing application now.... \n");
+
+        id_inputted = RESET_INPUT;
+
+        close(sockfd);
+        sleep(1);
+        exit(1);
+    }
+}
+
+/************************************************************************************************
+ * func:            Upon successfully connecting to the server receives 
+ *                  returned client id (i.e.process id) which this function displays in client UI 
+ *                 
+ * param sock_id:   Socket file descripter
+**************************************************************************************************/
+int connection_success(int sock_id)
+{
     int clientID;
 
     int number_of_bytes;
@@ -487,6 +574,11 @@ int connection_success(int sock_id) /* READ UP NETWORK TO BYTE CONVERSION NEEDED
     return clientID;
 }
 
+/************************************************************************************************
+ * func:            Prints user commands and their descriptions to the screen
+ * 
+ *                 
+**************************************************************************************************/
 void display_options()
 {
     printf("\nUsage: \n");
@@ -500,13 +592,32 @@ void display_options()
     printf("\n SEND <channelid> <message>    :  Send a new message to given channel ID \n");
     printf("\n BYE                           :  Shutdown connection \n");
 }
+
+/************************************************************************************************
+ * func:            Prints instructions to access OPTIONS 
+ * 
+ *                 
+**************************************************************************************************/
 void display_menu()
 {
     printf("\n See Usage type [OPTIONS]\n");
     printf("\nType Command: ");
 }
 
-// Creates a request object and checks if message included or not
+/************************************************************************************************
+ * func:               Creates a request object for sending to the server
+ *                   
+ *                 
+ * param command:      Numerical value of NEXT, SUB etc. command
+ * 
+ * param channel_id:   Channel id user inputs on the screen
+ * 
+ * param clientID:     User's client id
+ * 
+ * param *message:     message_t struct for if user is sending a message to the server 
+ * 
+ * param liveFeedFlag:     bool numerical value to indicate if user requesting livefeed on/off 
+**************************************************************************************************/
 request_t createRequest(int command, int channel_id, int clientID, message_t *message, int liveFeedFlag)
 {
 
@@ -522,18 +633,23 @@ request_t createRequest(int command, int channel_id, int clientID, message_t *me
         clientRequest.client_message = *message;
     }
 
-    // printf("\n Client Request Object:\n command id %d\n channel id %d \n client id %d\n client message %s\n",
-    //        clientRequest.commandID, clientRequest.channelID, clientRequest.clientID, clientRequest.client_message.content);
-
     return clientRequest;
 }
 
-// Client requests to subscribe to channel
-int sendRequest(request_t clientRequest, int sock_id)
+/************************************************************************************************
+ * func:                    Sends the request object to the server using socket's internal send()
+ *                   
+ *                 
+ * param clientRequest:     request_t struct i.e. the request object holds information on user
+ *                          inputs/command that server will process.
+ * 
+ * param sock_fd:            Socket file descriptor
+**************************************************************************************************/
+int sendRequest(request_t clientRequest, int sock_fd)
 {
 
     // send request to server
-    if (send(sock_id, &clientRequest, sizeof(struct request), 0) == -1)
+    if (send(sock_fd, &clientRequest, sizeof(struct request), 0) == -1)
     {
         perror("CLIENT: request to server failed [commandInput]...\n");
         return 1;
@@ -541,6 +657,18 @@ int sendRequest(request_t clientRequest, int sock_id)
 
     return 0; // requests successful.
 }
+
+/************************************************************************************************
+ * func:                    Parses user's message checks if the length is less or equal to 1024
+ *                          copies into message_t struct.
+ *                   
+ *                 
+ * param *client_message:   Message message_t struct 
+ * 
+ * param *message:          Char message pointer to the message itself
+ * 
+ * param *clientID:         User's client id
+**************************************************************************************************/
 int parseUserMessage(message_t *client_message, char *message, int clientID)
 {
 
@@ -550,8 +678,6 @@ int parseUserMessage(message_t *client_message, char *message, int clientID)
 
         strncpy(client_message->content, message, MAX_MESSAGE_LENGTH);
         client_message->ownerID = clientID;
-
-        // printf("\nTESTING: content %s  id %d\n", client_message->content, client_message->ownerID);
 
         return 0;
     }
